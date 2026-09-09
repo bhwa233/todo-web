@@ -1,337 +1,516 @@
-'use client'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { ChevronsUpDown, Plus, Tag, X } from 'lucide-react'
-import TaskCard, { priorityConfig } from './components/TaskCard'; // 从 TaskCard 导入
-import { Priority, Task } from '@prisma/client'; // 确保 Priority 已导入
-import { useMemo } from 'react'; // 导入 useMemo
-import { AggregatedTask } from '../../src/api/task/taskActions'; // 导入 AggregatedTask 类型
-import { TaskTag } from '../../src/api/task/tagActions'; // 导入 TaskTag 类型
-import { useImmer } from 'use-immer'
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocalStorageState } from 'ahooks';
 import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import { useEffect, useState } from 'react'
-import useLocalStorageRequest from '../../src/hooks/useLocalStorageRequest'
+  ArrowDown,
+  ArrowUp,
+  CheckCheck,
+  Columns3,
+  Grid2X2,
+  LayoutGrid,
+  List,
+  Plus,
+  RefreshCw,
+  Search,
+  Table2,
+  X,
+} from 'lucide-react';
+import { fetchTasks, updateTask, type Task } from '@/api/task/taskActions';
+import { fetchTaskTags } from '@/api/task/tagActions';
+import useLocalStorageRequest from '@/hooks/useLocalStorageRequest';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
-import { cn, getTagColor } from '../../src/lib/utils'
-import { useThrottleFn } from 'ahooks'
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn, startConfettiAnimation } from '@/lib/utils';
+import TaskComposer from './components/TaskComposer';
+import TaskTagManager from './components/TaskTagManager';
+import { ToastAction } from '@/components/ui/toast';
+import TaskViews from './components/TaskViews';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import { createTask, fetchAggregatedTask, NewTask } from '../../src/api/task/taskActions'
-import { fetchTaskTags, createTaskTag, deleteTaskTag } from '../../src/api/task/tagActions'
-import { useToast } from '../../src/hooks/use-toast'
-import { AutosizeTextarea } from '../../src/components/ui/AutosizeTextarea';
+  selectTasks,
+  statuses,
+  statusConfig,
+  TASK_STATUS,
+  type TaskChanges,
+  type TaskCreationDefaults,
+  type TaskFilters,
+  type TaskSort,
+  type TaskView,
+} from './task-model';
 
-// 新增常量定义
-const TASK_STATUS = {
-    UNCOMPLETED: '0',
-    COMPLETED: '1'
-} as const
+const views = [
+  {
+    value: 'cards',
+    label: '卡片',
+    icon: LayoutGrid,
+    description: '按优先级归类，留意每件重要的事。',
+  },
+  {
+    value: 'list',
+    label: '列表',
+    icon: List,
+    description: '一行一件事，专注完成手头的任务。',
+  },
+  {
+    value: 'table',
+    label: '表格',
+    icon: Table2,
+    description: '集中整理任务，点击列头调整排序。',
+  },
+  {
+    value: 'matrix',
+    label: '四象限',
+    icon: Grid2X2,
+    description: '拖动手柄调整优先级，分清重要与紧急。',
+  },
+  {
+    value: 'board',
+    label: '看板',
+    icon: Columns3,
+    description: '拖动手柄改变状态，让进展一目了然。',
+  },
+] as const;
+const sortOptions: { value: TaskSort; label: string }[] = [
+  { value: 'priority', label: '优先级' },
+  { value: 'createTime', label: '创建时间' },
+  { value: 'name', label: '任务名称' },
+  { value: 'status', label: '任务状态' },
+];
+const defaultFilters: TaskFilters = {
+  search: '',
+  tag: 'all',
+  status: 'all',
+  sort: 'priority',
+  descending: true,
+};
+const emptyTasks: Task[] = [];
 
-
-const PRIORITY_WEIGHTS: Record<Priority, number> = {
-    [Priority.IMPORTANT_URGENT]: 4,
-    [Priority.IMPORTANT_NOT_URGENT]: 3,
-    [Priority.URGENT_NOT_IMPORTANT]: 2,
-    [Priority.NOT_IMPORTANT_NOT_URGENT]: 1
-}
-
-const DEFAULT_NEW_TASK: NewTask = {
-    name: '',
-    remark: '',
-    status: TASK_STATUS.UNCOMPLETED,
-    priority: Priority.NOT_IMPORTANT_NOT_URGENT,
-}
-
-const COMPLETED_TASKS_LIMIT = 50
-
-// 更新 filteredTasks 的类型声明，使用 AggregatedTask
-interface GroupedUncompletedTasks {
-    [key: string]: AggregatedTask[]; // 使用 Priority 枚举值作为键，值为 AggregatedTask 数组
-}
-
-interface FilteredTasks {
-    uncompletedGrouped: GroupedUncompletedTasks;
-    completed: AggregatedTask[]; // 使用 AggregatedTask 数组
+function TaskLoading() {
+  return (
+    <div
+      className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 p-4 sm:p-6"
+      role="status"
+      aria-label="正在加载任务"
+    >
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-64 w-full rounded-xl" />
+    </div>
+  );
 }
 
 export default function Page() {
-    const { data: tasks = [], mutate, refresh: refreshTasks } = useLocalStorageRequest<AggregatedTask[], []>(fetchAggregatedTask, {
-        cacheKey: 'AggregatedTask',
-    });
-    const { data: tags = [], refresh: refreshTags } = useLocalStorageRequest<TaskTag[], []>(fetchTaskTags, {
-        cacheKey: 'TaskTags',
-    });
-
-    const { toast } = useToast()
-    const [newTask, setNewTask] = useImmer<NewTask>(DEFAULT_NEW_TASK);
-    const [newTagName, setNewTagName] = useState('');
-    const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
-
-    useEffect(() => {
-        refreshTasks();
-    }, []);
-
-    // 修改 filteredTasks 的计算逻辑，并使用 useMemo 优化性能
-    const filteredTasks: FilteredTasks = useMemo(() => {
-        const uncompleted = tasks
-            .filter(task => task.status === TASK_STATUS.UNCOMPLETED && task.type === 'task')
-            .sort((a, b) => PRIORITY_WEIGHTS[b.priority || Priority.NOT_IMPORTANT_NOT_URGENT] -
-                PRIORITY_WEIGHTS[a.priority || Priority.NOT_IMPORTANT_NOT_URGENT]);
-
-        const uncompletedGrouped = uncompleted.reduce((acc, task) => {
-            const priorityKey = task.priority || Priority.NOT_IMPORTANT_NOT_URGENT;
-            if (!acc[priorityKey]) {
-                acc[priorityKey] = [];
-            }
-            acc[priorityKey].push(task);
-            return acc;
-        }, {} as GroupedUncompletedTasks);
-
-        // 对分组后的任务按优先级排序（确保高优先级在前）
-        const sortedPriorityKeys = Object.keys(uncompletedGrouped).sort((a, b) =>
-            PRIORITY_WEIGHTS[b as Priority] - PRIORITY_WEIGHTS[a as Priority]
-        );
-
-        const sortedUncompletedGrouped: GroupedUncompletedTasks = {};
-        sortedPriorityKeys.forEach(key => {
-            sortedUncompletedGrouped[key] = uncompletedGrouped[key as Priority];
-        });
-
-        const completed = tasks
-            .filter(task => task.status === TASK_STATUS.COMPLETED)
-            .sort((a, b) => new Date(b.updateTime).getTime() - new Date(a.updateTime).getTime()) // 使用 updateTime 排序
-            .slice(0, COMPLETED_TASKS_LIMIT);
-
-        return { uncompletedGrouped: sortedUncompletedGrouped, completed };
-    }, [tasks]); // 添加 tasks 作为依赖项
-
-    const handleDeleteTag = async (tagId: string) => {
-        try {
-            await deleteTaskTag(tagId);
-            await refreshTags();
-            toast({ title: "成功", description: "标签删除成功。" }) // 添加成功提示
-        } catch (error) {
-            console.error('Failed to delete tag:', error);
-            toast({ title: "错误", description: "标签删除失败。", variant: "destructive" }) // 添加失败提示
-        }
-    };
-
-    // 优化任务处理逻辑
-    const handleAddTask = useThrottleFn(async () => {
-        const trimmedName = newTask.name?.trim();
-        if (!trimmedName) return;
-
-        setNewTask(draft => { draft.name = ''; }); // 清空输入框在请求前
-        try {
-            await createTask({ ...newTask, name: trimmedName });
-            await refreshTasks()
-            toast({
-                title: "成功",
-                description: "任务添加成功。",
-            })
-        } catch (error) {
-            toast({
-                title: "错误",
-                description: "任务添加失败。",
-                variant: "destructive",
-            })
-            // 如果失败，可能需要恢复输入框内容，或者让用户重试
-            // setNewTask(draft => { draft.name = trimmedName; }); 
-        }
-
-    }, { wait: 1000 }).run;
-
-    // 优化标签处理逻辑
-    const handleAddTag = useThrottleFn(async () => {
-        const trimmedTagName = newTagName.trim();
-        if (!trimmedTagName) return;
-
-        try {
-            await createTaskTag({ name: trimmedTagName });
-            setNewTagName('');
-            await refreshTags();
-            toast({ title: "成功", description: "标签添加成功。" }) // 添加成功提示
-        } catch (error) {
-            console.error('Failed to create tag:', error);
-            toast({ title: "错误", description: "标签添加失败。", variant: "destructive" }) // 添加失败提示
-        }
-    }, { wait: 1000 }).run;
-
-
-    // 更新 JSX 以渲染分组后的未完成任务
-    return (
-        // 减少垂直内边距 p-4 -> p-2
-        <div className="flex-1 p-2 " suppressHydrationWarning >
-            {/* 减少输入区域的垂直间距 space-y-2 -> space-y-1 */}
-            <div className="space-y-1 mb-2"> {/* 增加底部外边距 */} 
-                <AutosizeTextarea
-                    placeholder="添加任务 (AI自动生成标签)"
-                    value={newTask.name}
-                    onChange={(e) => setNewTask(draft => { draft.name = e.target.value })}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleAddTask();
-                        }
-                    }}
-                    className="w-full resize-none"
-                    minHeight={36} // 稍微减小最小高度
-                />
-                {/* 减少按钮行的垂直内边距 */}
-                <div className="flex items-center justify-between gap-2 pt-1"> {/* 增加顶部内边距 */} 
-                    <Select
-                        value={newTask.priority || Priority.NOT_IMPORTANT_NOT_URGENT}
-                        onValueChange={(value: Priority) =>
-                            setNewTask(draft => {
-                                draft.priority = value;
-                            })
-                        }
-                    >
-                        {/* 减小 SelectTrigger 的高度 h-9 -> h-8 */}
-                        <SelectTrigger className="w-[140px] h-8"> 
-                            <SelectValue placeholder="优先级" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {/* 使用 priorityConfig 动态生成选项，并明确类型 */} 
-                            {Object.entries(priorityConfig).map(([value, config]: [string, { label: string; color: string }]) => (
-                                <SelectItem key={value} value={value} className={cn("text-xs", config.color)}>
-                                    {config.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    {/* ... 添加任务和标签管理按钮 ... */} 
-                    <div className="flex items-center gap-2">
-                        {/* 减小 Button 的尺寸 size="icon" -> size="sm" */}
-                        <Button size="sm" onClick={handleAddTask} disabled={!newTask.name?.trim()}> {/* 禁用条件 */} 
-                            <Plus className="w-4 h-4" />
-                        </Button>
-                        <Dialog open={isTagDialogOpen} onOpenChange={setIsTagDialogOpen}>
-                            <DialogTrigger asChild>
-                                {/* 减小 Button 的尺寸 size="icon" -> size="sm" */}
-                                <Button variant="outline" size="sm">
-                                    <Tag className="w-4 h-4" />
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>管理标签</DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            placeholder="新标签名称"
-                                            value={newTagName}
-                                            onChange={(e) => setNewTagName(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleAddTag()
-                                                }
-                                            }}
-                                        />
-                                        <Button onClick={handleAddTag} disabled={!newTagName.trim()}>添加</Button> {/* 禁用条件 */}
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {tags.map((tag) => (
-                                            <Badge
-                                                key={tag.id}
-                                                variant="secondary"
-                                                className={cn(
-                                                    "flex items-center gap-1 cursor-pointer",
-                                                    getTagColor(tag.name)
-                                                )}
-                                            >
-                                                {tag.name}
-                                                <button
-                                                    onClick={() => handleDeleteTag(tag.id)}
-                                                    className="ml-1 rounded-full hover:bg-destructive/80 hover:text-destructive-foreground p-0.5 transition-colors" // 改进删除按钮样式和交互
-                                                >
-                                                    <X className="w-3 h-3" />
-                                                </button>
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-                    </div>
-                </div>
-            </div>
-            {/* 减少任务列表区域的垂直间距 space-y-4 -> space-y-2 */}
-            <div className="space-y-2">
-                {/* 渲染未完成任务，按优先级分组 */} 
-                {Object.entries(filteredTasks.uncompletedGrouped).map(([priority, tasksInGroup]) => (
-                    <Collapsible key={priority} defaultOpen>
-                        {/* 减小 CollapsibleTrigger 的垂直内边距 p-2 -> py-1 px-2 */}
-                        <CollapsibleTrigger className='flex w-full items-center text-sm py-1 px-2 font-medium rounded-md hover:bg-accent transition-colors'>
-                            <ChevronsUpDown className="h-4 w-4 mr-2 flex-shrink-0" /> 
-                            <div className="sr-only">Toggle</div>
-                            <span className={cn("font-semibold truncate", priorityConfig[priority as Priority]?.color)}> 
-                                {priorityConfig[priority as Priority]?.label || '未知优先级'}
-                            </span>
-                            <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">({tasksInGroup.length})</span> 
-                        </CollapsibleTrigger>
-                        {/* 移除 CollapsibleContent 的上边距 pt-1 */}
-                        <CollapsibleContent>
-                            {/* 减小网格间距 gap-4 -> gap-2, 减小垂直内边距 pb-2 -> pb-1 */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 px-2 pb-1"> 
-                                {tasksInGroup.map((task) => (
-                                    <TaskCard
-                                        key={task.id}
-                                        task={task} 
-                                        setTasks={mutate}
-                                        tags={tags}
-                                    />
-                                ))}
-                            </div>
-                        </CollapsibleContent>
-                    </Collapsible>
-                ))}
-
-                {/* 渲染已完成任务 */} 
-                {filteredTasks.completed.length > 0 && ( 
-                    <Collapsible defaultOpen>
-                        {/* 减小 CollapsibleTrigger 的垂直内边距 p-2 -> py-1 px-2 */}
-                        <CollapsibleTrigger className='flex w-full items-center text-sm py-1 px-2 font-medium rounded-md hover:bg-accent transition-colors'>
-                            <ChevronsUpDown className="h-4 w-4 mr-2 flex-shrink-0" /> 
-                            <div className="sr-only">Toggle</div>
-                            已完成
-                            <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">({filteredTasks.completed.length})</span> 
-                        </CollapsibleTrigger>
-                        {/* 移除 CollapsibleContent 的上边距 pt-1 */}
-                        <CollapsibleContent>
-                            {/* 减小网格间距 gap-4 -> gap-2, 减小垂直内边距 pb-2 -> pb-1 */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 px-2 pb-1"> 
-                                {filteredTasks.completed.map((task) => (
-                                    <TaskCard
-                                        key={task.id}
-                                        task={task} 
-                                        setTasks={mutate}
-                                        tags={tags}
-                                    />
-                                ))}
-                            </div>
-                        </CollapsibleContent>
-                    </Collapsible>
-                )}
-            </div>
-        </div>
-    );
+  // Both task cache and view preference use browser storage. Mount together to
+  // avoid server/client markup differences from an existing local cache.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  return mounted ? <TaskWorkspace /> : <TaskLoading />;
 }
 
+function TaskWorkspace() {
+  const {
+    data: tasks = emptyTasks,
+    mutate,
+    loading,
+    error,
+    refresh,
+  } = useLocalStorageRequest(fetchTasks, { cacheKey: 'TaskItems.v1' });
+  const {
+    data: tags = [],
+    mutate: mutateTags,
+    refresh: refreshTags,
+  } = useLocalStorageRequest(fetchTaskTags, { cacheKey: 'TaskTags' });
+  const [storedView, setStoredView] = useLocalStorageState<string>(
+    'task.view.v1',
+    { defaultValue: 'cards' },
+  );
+  const view: TaskView =
+    views.find((item) => item.value === storedView)?.value ?? 'cards';
+  const [filters, setFilters] = useState<TaskFilters>(defaultFilters);
+  const [creationDefaults, setCreationDefaults] =
+    useState<TaskCreationDefaults | null>(null);
+  const creationTrigger = useRef<HTMLElement | null>(null);
+  const globalCreateButton = useRef<HTMLButtonElement | null>(null);
+  function openComposer(defaults: TaskCreationDefaults = {}) {
+    creationTrigger.current = document.activeElement as HTMLElement | null;
+    setCreationDefaults(defaults);
+  }
+  function clearFilters() {
+    setFilters((current) => ({
+      ...current,
+      search: '',
+      tag: 'all',
+      status: 'all',
+    }));
+  }
+  function taskCreated(task: Task) {
+    mutate((current) => [task, ...(current ?? [])]);
+    const hidden = selectTasks([task], filters).length === 0;
+    toast({
+      title: '任务已添加',
+      description: hidden
+        ? '当前筛选下不可见。'
+        : task.status === TASK_STATUS.DONE
+          ? '已添加到已完成区域。'
+          : undefined,
+      action: hidden ? (
+        <ToastAction altText="清除筛选以查看新任务" onClick={clearFilters}>
+          清除筛选
+        </ToastAction>
+      ) : undefined,
+    });
+  }
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const updateLocks = useRef(new Set<string>());
+  const { toast } = useToast();
+  const visibleTasks = useMemo(
+    () => selectTasks(tasks, filters),
+    [tasks, filters],
+  );
+  const visibleTags = useMemo(() => {
+    const known = new Map(tags.map((tag) => [tag.id, tag]));
+    for (const task of tasks)
+      for (const tag of task.tags) if (!tag.deletedAt) known.set(tag.id, tag);
+    return [...known.values()];
+  }, [tasks, tags]);
+  const hasFilters =
+    filters.search !== '' || filters.tag !== 'all' || filters.status !== 'all';
+  const blockedIds = useMemo(
+    () => (loading ? new Set(tasks.map((task) => task.id)) : pendingIds),
+    [loading, tasks, pendingIds],
+  );
+
+  async function saveTask(id: string, changes: TaskChanges): Promise<boolean> {
+    const previous = tasks.find((task) => task.id === id);
+    if (!previous || loading || updateLocks.current.has(id)) return false;
+    updateLocks.current.add(id);
+    setPendingIds(new Set(updateLocks.current));
+    mutate((current) =>
+      (current ?? []).map((task) =>
+        task.id === id ? { ...task, ...changes, updateTime: new Date() } : task,
+      ),
+    );
+    try {
+      const saved = await updateTask(id, changes);
+      mutate((current) =>
+        (current ?? []).map((task) => (task.id === id ? saved : task)),
+      );
+      if (
+        changes.status === TASK_STATUS.DONE &&
+        previous.status !== TASK_STATUS.DONE &&
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      )
+        startConfettiAnimation();
+      return true;
+    } catch {
+      // Roll back only this task, preserving concurrent updates to other tasks.
+      mutate((current) =>
+        (current ?? []).map((task) => (task.id === id ? previous : task)),
+      );
+      toast({
+        title: '保存失败',
+        description: '已恢复原内容，请重试。',
+        variant: 'destructive',
+      });
+      return false;
+    } finally {
+      updateLocks.current.delete(id);
+      setPendingIds(new Set(updateLocks.current));
+    }
+  }
+  function sortBy(sort: TaskSort) {
+    setFilters((current) => ({
+      ...current,
+      sort,
+      descending:
+        current.sort === sort
+          ? !current.descending
+          : sort === 'priority' || sort === 'createTime',
+    }));
+  }
+  function refreshAll() {
+    refresh();
+    refreshTags();
+  }
+
+  return (
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 p-3 sm:gap-6 sm:p-6">
+      <Tabs
+        value={view}
+        onValueChange={(value) => setStoredView(value)}
+        className="flex min-w-0 flex-col gap-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TabsList
+            aria-label="任务展示模式"
+            className="grid h-auto w-full grid-cols-5 sm:inline-flex sm:w-auto"
+          >
+            {views.map(({ value, label, icon: Icon }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="flex-col gap-1 px-2 py-2 sm:flex-row sm:gap-1.5 sm:px-3"
+              >
+                <Icon className="size-4" />
+                <span>{label}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <div className="flex flex-wrap flex-1 items-center justify-end gap-2">
+            <p className="text-xs text-muted-foreground">
+              {views.find((item) => item.value === view)?.description}
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={refreshAll}
+              disabled={loading || pendingIds.size > 0}
+              aria-label="刷新任务"
+            >
+              <RefreshCw className={cn(loading && 'animate-spin')} />
+              刷新
+            </Button>
+            <Button
+              ref={globalCreateButton}
+              size="sm"
+              disabled={loading}
+              onClick={() => openComposer()}
+            >
+              <Plus />
+              新增任务
+            </Button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-48 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
+            <Input
+              aria-label="搜索任务"
+              placeholder="搜索任务、备注或标签…"
+              value={filters.search}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  search: event.target.value,
+                }))
+              }
+              className="pl-9"
+            />
+          </div>
+          <Select
+            value={filters.tag}
+            onValueChange={(tag) =>
+              setFilters((current) => ({ ...current, tag }))
+            }
+          >
+            <SelectTrigger aria-label="按标签筛选" className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">全部标签</SelectItem>
+                <SelectItem value="untagged">无标签</SelectItem>
+                {visibleTags.map((tag) => (
+                  <SelectItem key={tag.id} value={tag.id}>
+                    {tag.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <TaskTagManager
+            tags={visibleTags}
+            onTagCreated={(tag) =>
+              mutateTags((current) => [tag, ...(current ?? [])])
+            }
+            onTagDeleted={(id) => {
+              mutateTags((current) =>
+                (current ?? []).filter((tag) => tag.id !== id),
+              );
+              mutate((current) =>
+                (current ?? []).map((task) => ({
+                  ...task,
+                  tags: task.tags.filter((tag) => tag.id !== id),
+                })),
+              );
+              if (filters.tag === id)
+                setFilters((current) => ({ ...current, tag: 'all' }));
+            }}
+          />
+          <Select
+            value={filters.status}
+            onValueChange={(status) =>
+              setFilters((current) => ({ ...current, status }))
+            }
+          >
+            <SelectTrigger aria-label="按状态筛选" className="w-[120px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">全部状态</SelectItem>
+                {statuses.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {statusConfig[status].label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Select
+            value={filters.sort}
+            onValueChange={(sort) =>
+              setFilters((current) => ({
+                ...current,
+                sort: sort as TaskSort,
+                descending: sort === 'priority' || sort === 'createTime',
+              }))
+            }
+          >
+            <SelectTrigger aria-label="排序依据" className="w-[126px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {sortOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={
+              filters.descending
+                ? '当前降序，切换为升序'
+                : '当前升序，切换为降序'
+            }
+            onClick={() =>
+              setFilters((current) => ({
+                ...current,
+                descending: !current.descending,
+              }))
+            }
+          >
+            {filters.descending ? <ArrowDown /> : <ArrowUp />}
+          </Button>
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setFilters((current) => ({
+                  ...current,
+                  search: '',
+                  tag: 'all',
+                  status: 'all',
+                }))
+              }
+            >
+              <X />
+              清除筛选
+            </Button>
+          )}
+        </div>
+        <div
+          className="flex items-center justify-between text-xs text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          <span>
+            显示 {visibleTasks.length} /{' '}
+            {tasks.filter((task) => !task.deletedAt).length} 项任务
+          </span>
+          {pendingIds.size > 0 && <span>正在保存…</span>}
+        </div>
+        {error && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center gap-2 text-sm text-destructive"
+          >
+            任务加载失败
+            {tasks.length > 0 ? '，当前显示缓存内容。' : '，请重试。'}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshAll}
+              disabled={loading || pendingIds.size > 0}
+            >
+              重试
+            </Button>
+          </div>
+        )}
+        {views.map((item) => (
+          <TabsContent key={item.value} value={item.value} className="mt-0">
+            {view === item.value &&
+              (loading && !tasks.length ? (
+                <Skeleton className="h-64 w-full rounded-xl" />
+              ) : (
+                <>
+                  {!visibleTasks.length && (
+                    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed px-4 py-10 text-center">
+                      <CheckCheck className="size-8 text-muted-foreground" />
+                      <p className="text-sm font-medium">
+                        {error
+                          ? '暂时无法获取任务'
+                          : hasFilters
+                            ? '没有匹配的任务'
+                            : '从一件小事开始'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {error
+                          ? '点击重试，重新连接。'
+                          : hasFilters
+                            ? '试试其他关键词，或清除筛选条件。'
+                            : '点击新增任务，记下接下来要做的事。'}
+                      </p>
+                    </div>
+                  )}
+                  {(visibleTasks.length > 0 ||
+                    view === 'matrix' ||
+                    view === 'board') && (
+                    <TaskViews
+                      tasks={visibleTasks}
+                      view={view}
+                      filters={filters}
+                      onSort={sortBy}
+                      onUpdate={saveTask}
+                      pendingIds={blockedIds}
+                      onCreate={openComposer}
+                      creatingDisabled={loading}
+                    />
+                  )}
+                </>
+              ))}
+          </TabsContent>
+        ))}
+      </Tabs>
+      {creationDefaults !== null && (
+        <TaskComposer
+          defaults={creationDefaults}
+          disabled={loading}
+          onCreated={taskCreated}
+          onClose={() => setCreationDefaults(null)}
+          onRestoreFocus={() => {
+            const target = creationTrigger.current;
+            if (target?.isConnected) target.focus();
+            else globalCreateButton.current?.focus();
+          }}
+        />
+      )}
+    </div>
+  );
+}

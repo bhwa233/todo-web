@@ -28,7 +28,7 @@ export default function RootLayout({
                 defaultTheme="dark"
               >
                 <CssBaseline enableColorScheme />
-                <main className='min-h-screen h-full w-screen'>
+                <main className='min-h-screen h-full w-full min-w-0'>
                   <Header />
                   {children}
                   <Toaster />

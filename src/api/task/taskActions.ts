@@ -4,9 +4,8 @@ import {
   Task as PrismaTask,
   TrackItem,
   TaskTag,
-  Priority,
 } from '@prisma/client';
-import { createTrackItem, fetchTrackMetas } from '../habitActions';
+import { fetchTrackMetas } from '../habitActions';
 import { generateTaskTags } from './tagActions';
 
 const prisma = new PrismaClient();
@@ -34,7 +33,7 @@ export const createTask = async (taskData: NewTask): Promise<Task> => {
 
   // 异步生成和连接标签
   generateTaskTags(taskData.name || '')
-    .then(tags => {
+    .then((tags) => {
       return prisma.task.update({
         where: { id: task.id },
         data: {
@@ -47,7 +46,7 @@ export const createTask = async (taskData: NewTask): Promise<Task> => {
         },
       });
     })
-    .catch(error => {
+    .catch((error) => {
       console.error('Failed to generate or connect tags:', error);
       // 可以在这里添加错误处理逻辑，例如记录日志或通知管理员
     });
@@ -57,9 +56,10 @@ export const createTask = async (taskData: NewTask): Promise<Task> => {
 
 export const fetchTasks = async (): Promise<Task[]> => {
   return await prisma.task.findMany({
+    where: { deletedAt: null },
     orderBy: { createTime: 'desc' },
     include: {
-      tags: true,
+      tags: { where: { deletedAt: null } },
     },
   });
 };
@@ -93,6 +93,12 @@ export const fetchAggregatedTask = async () => {
 };
 
 export const updateTask = async (id: string, data: Partial<Task>) => {
+  if (data.status !== undefined && !['0', '1', '2'].includes(data.status)) {
+    throw new Error('Invalid task status');
+  }
+  if (data.name !== undefined && !data.name.trim()) {
+    throw new Error('Task name cannot be empty');
+  }
   // 从数据中提取 tags，并从更新数据中移除它
   const { tags, ...updateData } = data;
 
@@ -100,6 +106,7 @@ export const updateTask = async (id: string, data: Partial<Task>) => {
     where: { id },
     data: {
       ...updateData,
+      updateTime: new Date(),
       // 如果需要更新 tags，应该使用正确的关系更新语法
       ...(tags && {
         tags: {
@@ -108,7 +115,7 @@ export const updateTask = async (id: string, data: Partial<Task>) => {
       }),
     },
     include: {
-      tags: true,
+      tags: { where: { deletedAt: null } },
     },
   });
 };
