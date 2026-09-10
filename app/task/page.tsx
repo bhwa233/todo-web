@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocalStorageState } from 'ahooks';
+import { useLatest, useLocalStorageState } from 'ahooks';
 import {
   ArrowDown,
   ArrowUp,
@@ -16,7 +16,11 @@ import {
   Table2,
   X,
 } from 'lucide-react';
-import { fetchTasks, updateTask, type Task } from '@/api/task/taskActions';
+import {
+  fetchActiveTasks,
+  updateTask,
+  type Task,
+} from '@/api/task/taskActions';
 import { fetchTaskTags } from '@/api/task/tagActions';
 import useLocalStorageRequest from '@/hooks/useLocalStorageRequest';
 import { useToast } from '@/hooks/use-toast';
@@ -37,6 +41,8 @@ import TaskComposer from './components/TaskComposer';
 import TaskTagManager from './components/TaskTagManager';
 import { ToastAction } from '@/components/ui/toast';
 import TaskViews from './components/TaskViews';
+import { normalizeTaskTagNames } from '@/api/task/taskTagNames';
+import useCompletedTasks from './useCompletedTasks';
 import {
   selectTasks,
   statuses,
@@ -119,12 +125,14 @@ export default function Page() {
 
 function TaskWorkspace() {
   const {
-    data: tasks = emptyTasks,
-    mutate,
+    data: activeTasks = emptyTasks,
+    mutate: mutateActive,
     loading,
     error,
     refresh,
-  } = useLocalStorageRequest(fetchTasks, { cacheKey: 'TaskItems.v1' });
+  } = useLocalStorageRequest(fetchActiveTasks, {
+    cacheKey: 'ActiveTaskItems.v1',
+  });
   const {
     data: tags = [],
     mutate: mutateTags,
@@ -137,13 +145,60 @@ function TaskWorkspace() {
   const view: TaskView =
     views.find((item) => item.value === storedView)?.value ?? 'cards';
   const [filters, setFilters] = useState<TaskFilters>(defaultFilters);
+  const [completedOpen, setCompletedOpen] = useState(false);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const completedEnabled =
+    (view === 'table' || view === 'board' || completedOpen) &&
+    (filters.status === 'all' || filters.status === TASK_STATUS.DONE);
+  const completed = useCompletedTasks(
+    { search: filters.search.trim(), tag: filters.tag, status: filters.status },
+    completedEnabled,
+    pendingIds.size > 0,
+  );
+  const completedKey = useLatest(completed.key);
+  const tasks = useMemo(
+    () => [...activeTasks, ...completed.items],
+    [activeTasks, completed.items],
+  );
+  const matchingActive = selectTasks(activeTasks, filters).length;
+  const matchingTotal = matchingActive + (completed.matching ?? 0);
+  useEffect(
+    () => setCompletedOpen(filters.status === TASK_STATUS.DONE),
+    [filters.status],
+  );
+  function applyTaskChange(
+    previous: Task | undefined,
+    next: Task,
+    adjustCounts = true,
+  ) {
+    mutateActive((current) => {
+      const remaining = (current ?? []).filter((task) => task.id !== next.id);
+      return next.status === TASK_STATUS.DONE || next.deletedAt
+        ? remaining
+        : [next, ...remaining];
+    });
+    completed.applyChange(previous, next, adjustCounts);
+  }
+
   const [creationDefaults, setCreationDefaults] =
     useState<TaskCreationDefaults | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const creationTrigger = useRef<HTMLElement | null>(null);
   const globalCreateButton = useRef<HTMLButtonElement | null>(null);
   function openComposer(defaults: TaskCreationDefaults = {}) {
     creationTrigger.current = document.activeElement as HTMLElement | null;
     setCreationDefaults(defaults);
+  }
+  function openEditor(task: Task) {
+    creationTrigger.current = document.activeElement as HTMLElement | null;
+    setEditingTask(task);
+  }
+  function rememberTags(task: Task) {
+    mutateTags((current) => [
+      ...new Map(
+        [...(current ?? []), ...task.tags].map((tag) => [tag.id, tag]),
+      ).values(),
+    ]);
   }
   function clearFilters() {
     setFilters((current) => ({
@@ -154,7 +209,16 @@ function TaskWorkspace() {
     }));
   }
   function taskCreated(task: Task) {
-    mutate((current) => [task, ...(current ?? [])]);
+    rememberTags(task);
+    if (task.status === TASK_STATUS.DONE) completed.cancel();
+    applyTaskChange(undefined, task);
+    completed.refreshSummary();
+    if (
+      task.status === TASK_STATUS.DONE &&
+      completedEnabled &&
+      !completed.initialized
+    )
+      completed.loadMore();
     const hidden = selectTasks([task], filters).length === 0;
     toast({
       title: '任务已添加',
@@ -170,7 +234,6 @@ function TaskWorkspace() {
       ) : undefined,
     });
   }
-  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const updateLocks = useRef(new Set<string>());
   const { toast } = useToast();
   const visibleTasks = useMemo(
@@ -195,16 +258,39 @@ function TaskWorkspace() {
     if (!previous || loading || updateLocks.current.has(id)) return false;
     updateLocks.current.add(id);
     setPendingIds(new Set(updateLocks.current));
-    mutate((current) =>
-      (current ?? []).map((task) =>
-        task.id === id ? { ...task, ...changes, updateTime: new Date() } : task,
-      ),
-    );
+    const requestKey = completed.key;
+    completed.cancel();
+    const { tagNames, ...fields } = changes;
+    const now = new Date();
+    const optimistic: Task = {
+      ...previous,
+      ...fields,
+      updateTime: now,
+      tags:
+        tagNames === undefined
+          ? previous.tags
+          : normalizeTaskTagNames(tagNames).map((name) => {
+              const existing = visibleTags.find(
+                (tag) =>
+                  tag.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+              );
+              return existing
+                ? { ...existing, deletedAt: null }
+                : {
+                    id: `draft:${name}`,
+                    name,
+                    remark: null,
+                    createTime: now,
+                    updateTime: now,
+                    deletedAt: null,
+                  };
+            }),
+    };
+    applyTaskChange(previous, optimistic);
     try {
-      const saved = await updateTask(id, changes);
-      mutate((current) =>
-        (current ?? []).map((task) => (task.id === id ? saved : task)),
-      );
+      const saved = await updateTask(id, fields, tagNames);
+      rememberTags(saved);
+      applyTaskChange(optimistic, saved, requestKey === completedKey.current);
       if (
         changes.status === TASK_STATUS.DONE &&
         previous.status !== TASK_STATUS.DONE &&
@@ -214,8 +300,10 @@ function TaskWorkspace() {
       return true;
     } catch {
       // Roll back only this task, preserving concurrent updates to other tasks.
-      mutate((current) =>
-        (current ?? []).map((task) => (task.id === id ? previous : task)),
+      applyTaskChange(
+        optimistic,
+        previous,
+        requestKey === completedKey.current,
       );
       toast({
         title: '保存失败',
@@ -241,6 +329,7 @@ function TaskWorkspace() {
   function refreshAll() {
     refresh();
     refreshTags();
+    completed.refresh();
   }
 
   return (
@@ -337,12 +426,13 @@ function TaskWorkspace() {
               mutateTags((current) =>
                 (current ?? []).filter((tag) => tag.id !== id),
               );
-              mutate((current) =>
+              mutateActive((current) =>
                 (current ?? []).map((task) => ({
                   ...task,
                   tags: task.tags.filter((tag) => tag.id !== id),
                 })),
               );
+              completed.refresh();
               if (filters.tag === id)
                 setFilters((current) => ({ ...current, tag: 'all' }));
             }}
@@ -432,7 +522,10 @@ function TaskWorkspace() {
         >
           <span>
             显示 {visibleTasks.length} /{' '}
-            {tasks.filter((task) => !task.deletedAt).length} 项任务
+            {completed.total === undefined
+              ? '…'
+              : activeTasks.length + completed.total}{' '}
+            项任务
           </span>
           {pendingIds.size > 0 && <span>正在保存…</span>}
         </div>
@@ -453,6 +546,22 @@ function TaskWorkspace() {
             </Button>
           </div>
         )}
+        {completed.summaryError && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 text-sm text-destructive"
+          >
+            已完成任务数量加载失败。
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={completed.refreshSummary}
+              disabled={pendingIds.size > 0}
+            >
+              重试统计
+            </Button>
+          </div>
+        )}
         {views.map((item) => (
           <TabsContent key={item.value} value={item.value} className="mt-0">
             {view === item.value &&
@@ -460,7 +569,7 @@ function TaskWorkspace() {
                 <Skeleton className="h-64 w-full rounded-xl" />
               ) : (
                 <>
-                  {!visibleTasks.length && (
+                  {!matchingTotal && completed.matching !== undefined && (
                     <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed px-4 py-10 text-center">
                       <CheckCheck className="size-8 text-muted-foreground" />
                       <p className="text-sm font-medium">
@@ -479,7 +588,8 @@ function TaskWorkspace() {
                       </p>
                     </div>
                   )}
-                  {(visibleTasks.length > 0 ||
+                  {(matchingTotal > 0 ||
+                    completed.matching === undefined ||
                     view === 'matrix' ||
                     view === 'board') && (
                     <TaskViews
@@ -488,9 +598,13 @@ function TaskWorkspace() {
                       filters={filters}
                       onSort={sortBy}
                       onUpdate={saveTask}
+                      onEdit={openEditor}
                       pendingIds={blockedIds}
                       onCreate={openComposer}
                       creatingDisabled={loading}
+                      completed={completed}
+                      completedOpen={completedOpen}
+                      onCompletedOpenChange={setCompletedOpen}
                     />
                   )}
                 </>
@@ -498,12 +612,19 @@ function TaskWorkspace() {
           </TabsContent>
         ))}
       </Tabs>
-      {creationDefaults !== null && (
+      {(creationDefaults !== null || editingTask !== null) && (
         <TaskComposer
-          defaults={creationDefaults}
+          key={editingTask?.id ?? 'new'}
+          task={editingTask ?? undefined}
+          tags={visibleTags}
+          onSave={saveTask}
+          defaults={creationDefaults ?? {}}
           disabled={loading}
           onCreated={taskCreated}
-          onClose={() => setCreationDefaults(null)}
+          onClose={() => {
+            setCreationDefaults(null);
+            setEditingTask(null);
+          }}
           onRestoreFocus={() => {
             const target = creationTrigger.current;
             if (target?.isConnected) target.focus();

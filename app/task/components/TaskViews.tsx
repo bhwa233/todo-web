@@ -27,8 +27,11 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import CompletedTaskLoader from './CompletedTaskLoader';
+import type { CompletedTasksState } from '../useCompletedTasks';
 import TaskCard, {
   TaskName,
+  TaskEditButton,
   TaskPriority,
   TaskState,
   TaskTags,
@@ -55,9 +58,13 @@ interface Props {
   filters: TaskFilters;
   onSort: (column: TaskSort) => void;
   onUpdate: UpdateTask;
+  onEdit: (task: Task) => void;
   pendingIds: ReadonlySet<string>;
   onCreate: OpenTaskComposer;
   creatingDisabled: boolean;
+  completed: CompletedTasksState;
+  completedOpen: boolean;
+  onCompletedOpenChange: (open: boolean) => void;
 }
 
 export default function TaskViews({
@@ -66,17 +73,16 @@ export default function TaskViews({
   filters,
   onSort,
   onUpdate,
+  onEdit,
   pendingIds,
   onCreate,
   creatingDisabled,
+  completed,
+  completedOpen,
+  onCompletedOpenChange,
 }: Props) {
   const activeTasks = tasks.filter((task) => task.status !== TASK_STATUS.DONE);
-  const completed = tasks
-    .filter((task) => task.status === TASK_STATUS.DONE)
-    .sort(
-      (a, b) =>
-        new Date(b.updateTime).getTime() - new Date(a.updateTime).getTime(),
-    );
+  const completedItems = completed.items;
   if (view === 'table') {
     const columns: { key: TaskSort; label: string }[] = [
       { key: 'name', label: '任务' },
@@ -119,6 +125,9 @@ export default function TaskViews({
                 </TableHead>
               ))}
               <TableHead scope="col">标签</TableHead>
+              <TableHead scope="col">
+                <span className="sr-only">操作</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -126,6 +135,7 @@ export default function TaskViews({
               const props = {
                 task,
                 onUpdate,
+                onEdit,
                 pending: pendingIds.has(task.id),
               };
               return (
@@ -145,11 +155,21 @@ export default function TaskViews({
                   <TableCell className="min-w-32 max-w-60">
                     <TaskTags task={task} />
                   </TableCell>
+                  <TableCell>
+                    <TaskEditButton {...props} />
+                  </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
+        {(filters.status === 'all' || filters.status === TASK_STATUS.DONE) && (
+          <CompletedTaskLoader
+            completed={completed}
+            automatic={false}
+            disabled={pendingIds.size > 0}
+          />
+        )}
       </div>
     );
   }
@@ -157,8 +177,10 @@ export default function TaskViews({
     return (
       <TaskBoard
         mode="board"
+        completed={completed}
         tasks={tasks}
         onUpdate={onUpdate}
+        onEdit={onEdit}
         pendingIds={pendingIds}
         onCreate={onCreate}
         creatingDisabled={creatingDisabled}
@@ -171,6 +193,7 @@ export default function TaskViews({
           mode="matrix"
           tasks={activeTasks}
           onUpdate={onUpdate}
+          onEdit={onEdit}
           pendingIds={pendingIds}
           onCreate={onCreate}
           creatingDisabled={creatingDisabled}
@@ -220,6 +243,7 @@ export default function TaskViews({
                       task={task}
                       compact={view === 'list'}
                       onUpdate={onUpdate}
+                      onEdit={onEdit}
                       pending={pendingIds.has(task.id)}
                     />
                   ))}
@@ -229,14 +253,11 @@ export default function TaskViews({
           );
         })
       )}
-      {completed.length > 0 && (
-        <Collapsible
-          key={filters.status}
-          defaultOpen={filters.status === TASK_STATUS.DONE}
-        >
+      {(completed.matching !== 0 || completedItems.length > 0) && (
+        <Collapsible open={completedOpen} onOpenChange={onCompletedOpenChange}>
           <CollapsibleTrigger className="group flex w-full items-center gap-2 rounded-lg border-t px-1 py-3 text-left text-sm text-muted-foreground hover:bg-muted">
             <ChevronDown className="size-4 transition-transform group-data-[state=closed]:-rotate-90" />
-            已完成<Badge variant="secondary">{completed.length}</Badge>
+            已完成<Badge variant="secondary">{completed.matching ?? '…'}</Badge>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div
@@ -246,16 +267,21 @@ export default function TaskViews({
                   : 'grid gap-3 md:grid-cols-2 xl:grid-cols-3',
               )}
             >
-              {completed.map((task) => (
+              {completedItems.map((task) => (
                 <TaskCard
                   key={task.id}
                   task={task}
                   compact={view === 'list'}
                   onUpdate={onUpdate}
+                  onEdit={onEdit}
                   pending={pendingIds.has(task.id)}
                 />
               ))}
             </div>
+            <CompletedTaskLoader
+              completed={completed}
+              disabled={pendingIds.size > 0}
+            />
           </CollapsibleContent>
         </Collapsible>
       )}

@@ -21,6 +21,8 @@ import type { Task } from '@/api/task/taskActions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import CompletedTaskLoader from './CompletedTaskLoader';
+import type { CompletedTasksState } from '../useCompletedTasks';
 import TaskCard, { type TaskItemProps } from './TaskCard';
 import {
   priorities,
@@ -126,6 +128,7 @@ function TaskDropZone({
   border,
   count,
   children,
+  footer,
   onCreate,
   creatingDisabled,
 }: {
@@ -136,6 +139,7 @@ function TaskDropZone({
   border?: string;
   count: number;
   children: ReactNode;
+  footer?: ReactNode;
   onCreate?: () => void;
   creatingDisabled: boolean;
 }) {
@@ -182,6 +186,7 @@ function TaskDropZone({
             暂无任务，可拖到这里
           </p>
         )}
+        {footer}
       </div>
     </section>
   );
@@ -191,13 +196,17 @@ export default function TaskBoard({
   mode,
   tasks,
   onUpdate,
+  onEdit,
   pendingIds,
   onCreate,
   creatingDisabled,
+  completed,
 }: {
   mode: 'matrix' | 'board';
+  completed?: CompletedTasksState;
   tasks: Task[];
   onUpdate: UpdateTask;
+  onEdit: (task: Task) => void;
   pendingIds: ReadonlySet<string>;
   onCreate: OpenTaskComposer;
   creatingDisabled: boolean;
@@ -223,7 +232,10 @@ export default function TaskBoard({
           ...statusConfig[status],
           border: undefined,
           changes: { status } as TaskChanges,
-          items: tasks.filter((task) => taskStatus(task) === status),
+          items:
+            status === TASK_STATUS.DONE && completed
+              ? completed.items
+              : tasks.filter((task) => taskStatus(task) === status),
         }));
   const activeTask = tasks.find((task) => task.id === activeId);
   return (
@@ -271,7 +283,21 @@ export default function TaskBoard({
           <TaskDropZone
             key={group.id}
             {...group}
-            count={group.items.length}
+            count={
+              group.id === TASK_STATUS.DONE && completed
+                ? (completed.matching ?? group.items.length)
+                : group.items.length
+            }
+            footer={
+              group.id === TASK_STATUS.DONE &&
+              completed &&
+              completed.matching !== 0 ? (
+                <CompletedTaskLoader
+                  completed={completed}
+                  disabled={pendingIds.size > 0}
+                />
+              ) : undefined
+            }
             creatingDisabled={creatingDisabled}
             onCreate={
               mode === 'board' && group.id === TASK_STATUS.DONE
@@ -284,6 +310,7 @@ export default function TaskBoard({
                 key={task.id}
                 task={task}
                 onUpdate={onUpdate}
+                onEdit={onEdit}
                 pending={pendingIds.has(task.id)}
               />
             ))}

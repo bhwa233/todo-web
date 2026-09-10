@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import dayjs from 'dayjs';
 import type { Task } from '@/api/task/taskActions';
 import { Badge } from '@/components/ui/badge';
@@ -11,20 +11,12 @@ import {
   CardFooter,
   CardHeader,
 } from '@/components/ui/card';
-import { AutosizeTextarea } from '@/components/ui/AutosizeTextarea';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn, getTagColor } from '@/lib/utils';
+import TaskText from './TaskText';
 import {
-  priorities,
   priorityConfig,
-  statuses,
   statusConfig,
   taskPriority,
   taskStatus,
@@ -35,30 +27,17 @@ import {
 export interface TaskItemProps {
   task: Task;
   onUpdate: UpdateTask;
+  onEdit: (task: Task) => void;
   pending?: boolean;
 }
 
 export function TaskName({ task, onUpdate, pending }: TaskItemProps) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  async function save() {
-    if (draft === null || saving) return;
-    const name = draft.trim();
-    if (!name || name === task.name) {
-      setDraft(null);
-      return;
-    }
-    setSaving(true);
-    const saved = await onUpdate(task.id, { name });
-    setSaving(false);
-    if (saved) setDraft(null);
-  }
   return (
     <div className="flex min-w-0 flex-1 items-start gap-3">
       <Checkbox
         className="mt-1 shrink-0"
         checked={task.status === TASK_STATUS.DONE}
-        disabled={pending || saving}
+        disabled={pending}
         aria-label={`${task.status === TASK_STATUS.DONE ? '重新打开' : '完成'}任务：${task.name}`}
         onCheckedChange={(checked) =>
           void onUpdate(task.id, {
@@ -66,44 +45,14 @@ export function TaskName({ task, onUpdate, pending }: TaskItemProps) {
           })
         }
       />
-      {draft !== null ? (
-        <AutosizeTextarea
-          autoFocus
-          value={draft}
-          minHeight={28}
-          disabled={saving}
-          aria-label="编辑任务名称"
-          onFocus={(event) => event.currentTarget.select()}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={() => void save()}
-          onKeyDown={(event) => {
-            if (event.nativeEvent.isComposing) return;
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              setDraft(null);
-            }
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              void save();
-            }
-          }}
-          className="min-w-0 flex-1 px-1 py-0.5"
-        />
-      ) : (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => setDraft(task.name)}
-          title="点击编辑任务名称"
-          className={cn(
-            'min-w-0 flex-1 rounded-sm text-left text-sm leading-6 whitespace-pre-wrap [overflow-wrap:anywhere] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-            task.status === TASK_STATUS.DONE &&
-              'text-muted-foreground line-through',
-          )}
-        >
-          {task.name}
-        </button>
-      )}
+      <TaskText
+        text={task.name}
+        className={cn(
+          'min-w-0 flex-1 text-sm leading-6 whitespace-pre-wrap [overflow-wrap:anywhere]',
+          task.status === TASK_STATUS.DONE &&
+            'text-muted-foreground line-through',
+        )}
+      />
     </div>
   );
 }
@@ -124,63 +73,43 @@ export function TaskTags({ task }: { task: Task }) {
   );
 }
 
-export function TaskPriority({ task, onUpdate, pending }: TaskItemProps) {
+export function TaskPriority({ task }: { task: Task }) {
   return (
-    <Select
-      value={taskPriority(task)}
-      disabled={pending}
-      onValueChange={(priority) =>
-        void onUpdate(task.id, { priority: priority as Task['priority'] })
-      }
+    <Badge
+      variant="secondary"
+      className={priorityConfig[taskPriority(task)].color}
     >
-      <SelectTrigger
-        aria-label={`优先级：${task.name}`}
-        className={cn(
-          'h-8 w-[138px] shrink-0 text-xs',
-          priorityConfig[taskPriority(task)].color,
-        )}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          {priorities.map((priority) => (
-            <SelectItem key={priority} value={priority}>
-              {priorityConfig[priority].label}
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
+      {priorityConfig[taskPriority(task)].label}
+    </Badge>
   );
 }
 
-export function TaskState({ task, onUpdate, pending }: TaskItemProps) {
+export function TaskState({ task }: { task: Task }) {
   return (
-    <Select
-      value={taskStatus(task)}
+    <Badge variant="secondary" className={statusConfig[taskStatus(task)].color}>
+      {statusConfig[taskStatus(task)].label}
+    </Badge>
+  );
+}
+
+export function TaskEditButton({
+  task,
+  onEdit,
+  pending,
+}: Pick<TaskItemProps, 'task' | 'onEdit' | 'pending'>) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="size-8 shrink-0"
       disabled={pending}
-      onValueChange={(status) => void onUpdate(task.id, { status })}
+      title="编辑任务"
+      aria-label={`编辑任务：${task.name}`}
+      onClick={() => onEdit(task)}
     >
-      <SelectTrigger
-        aria-label={`状态：${task.name}`}
-        className={cn(
-          'h-8 w-[100px] shrink-0 text-xs',
-          statusConfig[taskStatus(task)].color,
-        )}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          {statuses.map((status) => (
-            <SelectItem key={status} value={status}>
-              {statusConfig[status].label}
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
+      <Pencil />
+    </Button>
   );
 }
 
@@ -196,7 +125,10 @@ export default function TaskCard({
         className="flex flex-col gap-2 border-b px-3 py-3 last:border-b-0 sm:flex-row sm:items-start sm:gap-4"
         aria-busy={props.pending}
       >
-        <TaskName {...props} />
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          <TaskName {...props} />
+          <TaskEditButton {...props} />
+        </div>
         <div className="flex flex-wrap items-center gap-2 pl-7 sm:max-w-[55%] sm:justify-end sm:pl-0">
           <TaskTags task={task} />
           <TaskState {...props} />
@@ -211,13 +143,15 @@ export default function TaskCard({
     >
       <CardHeader className="flex-row items-start gap-2 p-3">
         <TaskName {...props} />
+        <TaskEditButton {...props} />
         {dragHandle}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3 px-3 pb-3">
         {task.remark && (
-          <p className="line-clamp-3 pl-7 text-sm text-muted-foreground [overflow-wrap:anywhere]">
-            {task.remark}
-          </p>
+          <TaskText
+            text={task.remark}
+            className="pl-7 text-sm text-muted-foreground"
+          />
         )}
         <div className="pl-7">
           <TaskTags task={task} />

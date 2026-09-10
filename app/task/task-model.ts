@@ -10,7 +10,9 @@ export interface TaskCreationDefaults {
 }
 export type OpenTaskComposer = (defaults?: TaskCreationDefaults) => void;
 export type TaskView = 'cards' | 'list' | 'table' | 'matrix' | 'board';
-export type TaskChanges = Partial<Pick<Task, 'name' | 'status' | 'priority'>>;
+export type TaskChanges = Partial<
+  Pick<Task, 'name' | 'remark' | 'status' | 'priority'>
+> & { tagNames?: string[] };
 export type UpdateTask = (id: string, changes: TaskChanges) => Promise<boolean>;
 
 export const priorityConfig = {
