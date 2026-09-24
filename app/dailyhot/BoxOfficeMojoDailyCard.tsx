@@ -1,28 +1,32 @@
 import Image from 'next/image';
 import React from 'react';
 import Link from 'next/link';
+import dayjs from 'dayjs';
 import { Card } from '../../src/components/ui/card';
 import { ScrollArea } from '../../src/components/ui/scroll-area';
 import { formatTime } from './MaoyanMovieCard';
 
 const BOX_OFFICE_MOJO = 'https://www.boxofficemojo.com';
+const USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 
-// Box Office Mojo 全球年度票房榜数据类型
-interface GlobalBoxOfficeItem {
+// Box Office Mojo 北美日票房数据类型
+interface DailyBoxOfficeItem {
   rank: number;
   title: string;
   url: string;
-  worldwide: number;
-  domestic: number;
-  domesticRate: string;
-  foreign: number;
-  foreignRate: string;
+  daily: number;
+  changeDay: string;
+  changeWeek: string;
+  toDate: number;
+  days: number;
+  isNew: boolean;
 }
 
-interface GlobalBoxOfficeData {
-  year: string;
+interface DailyBoxOfficeData {
+  date: string;
   fetchedAt: number;
-  list: GlobalBoxOfficeItem[];
+  list: DailyBoxOfficeItem[];
 }
 
 // "$1,234,567" -> 1234567，"-" 等无数据时为 0
@@ -42,39 +46,49 @@ const decodeEntities = (text: string) =>
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>');
 
-// 服务端抓取并解析 Box Office Mojo 全球年度榜页面
-async function getGlobalBoxOfficeData(): Promise<GlobalBoxOfficeData | null> {
-  try {
-    const response = await fetch(`${BOX_OFFICE_MOJO}/year/world/`, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-      },
-      next: { revalidate: 60 * 60 * 6 } // 6小时重新验证
-    });
+const fetchHTML = async (url: string) => {
+  const response = await fetch(url, {
+    headers: { 'User-Agent': USER_AGENT },
+    next: { revalidate: 60 * 60 * 3 } // 3小时重新验证
+  });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.text();
+};
+
+// 服务端抓取并解析 Box Office Mojo 最近一天的北美日票房榜
+async function getDailyBoxOfficeData(): Promise<DailyBoxOfficeData | null> {
+  try {
+    // 日票房总览页的第一行即最近有数据的日期
+    const indexHTML = await fetchHTML(`${BOX_OFFICE_MOJO}/date/`);
+    const date = /href="\/date\/(\d{4}-\d{2}-\d{2})\//.exec(indexHTML)?.[1];
+    if (!date) {
+      throw new Error('未找到最新日期，页面结构可能已变化');
     }
 
-    const html = await response.text();
-    const year = /<h1[^>]*>(\d{4}) Worldwide Box Office/.exec(html)?.[1] ?? '';
+    const html = await fetchHTML(`${BOX_OFFICE_MOJO}/date/${date}/`);
 
-    const list: GlobalBoxOfficeItem[] = [];
-    for (const [row] of html.matchAll(/<tr><td[^>]*mojo-field-type-rank[\s\S]*?<\/tr>/g)) {
-      const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1]);
-      const link = /<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/.exec(cells[1] ?? '');
-      if (cells.length < 7 || !link) continue;
+    // 列顺序：排名、昨日排名、影片、当日票房、较昨日、较上周、影院数、场均、累计、上映天数、发行方、是否新片、是否估算
+    // 新片、估算行的 <tr> 带 class（如 mojo-annotation-isNewThisDay），需一并匹配
+    const list: DailyBoxOfficeItem[] = [];
+    for (const [row] of html.matchAll(/<tr[^>]*><td[^>]*mojo-field-type-rank[\s\S]*?<\/tr>/g)) {
+      const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1].trim());
+      const link = /<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/.exec(cells[2] ?? '');
+      if (cells.length < 12 || !link) continue;
 
       list.push({
         rank: Number(cells[0]),
         title: decodeEntities(link[2].trim()),
         url: `${BOX_OFFICE_MOJO}${link[1].split('?')[0]}`,
-        worldwide: parseMoney(cells[2]),
-        domestic: parseMoney(cells[3]),
-        domesticRate: cells[4],
-        foreign: parseMoney(cells[5]),
-        foreignRate: cells[6],
+        daily: parseMoney(cells[3]),
+        changeDay: cells[4],
+        changeWeek: cells[5],
+        toDate: parseMoney(cells[8]),
+        days: Number(cells[9]) || 0,
+        isNew: cells[11] === 'true',
       });
     }
 
@@ -82,15 +96,26 @@ async function getGlobalBoxOfficeData(): Promise<GlobalBoxOfficeData | null> {
       throw new Error('解析结果为空，页面结构可能已变化');
     }
 
-    return { year, fetchedAt: Date.now(), list };
+    return { date, fetchedAt: Date.now(), list };
   } catch (error) {
-    console.error('获取全球票房数据失败:', error);
+    console.error('获取北美日票房数据失败:', error);
     return null;
   }
 }
 
-const GlobalBoxOfficeCard = async ({ label, name }: { label: string; name: string }) => {
-  const boxOfficeData = await getGlobalBoxOfficeData();
+// 涨跌幅着色，"-" 表示无对比数据
+const ChangeText = ({ label, value }: { label: string; value: string }) => {
+  if (!value || value === '-') return null;
+  const color = value.startsWith('+') ? 'text-red-400' : 'text-green-400';
+  return (
+    <span>
+      {label} <span className={color}>{value}</span>
+    </span>
+  );
+};
+
+const BoxOfficeMojoDailyCard = async ({ label, name }: { label: string; name: string }) => {
+  const boxOfficeData = await getDailyBoxOfficeData();
 
   const header = (
     <div className="p-2 border-b border-zinc-800">
@@ -106,7 +131,7 @@ const GlobalBoxOfficeCard = async ({ label, name }: { label: string; name: strin
           }}
         />
         <span className="font-bold">
-          {label} {boxOfficeData?.year}
+          {label} {boxOfficeData && dayjs(boxOfficeData.date).format('M/D')}
         </span>
       </div>
     </div>
@@ -150,10 +175,16 @@ const GlobalBoxOfficeCard = async ({ label, name }: { label: string; name: strin
                   >
                     {movie.title}
                   </Link>
-                  <span className="text-yellow-400 font-bold shrink-0">{formatUSD(movie.worldwide)}</span>
+                  <span className="text-yellow-400 font-bold shrink-0">{formatUSD(movie.daily)}</span>
                 </div>
-                <div className="mt-1 text-xs text-zinc-400">
-                  北美 {formatUSD(movie.domestic)} ({movie.domesticRate}) · 国际 {formatUSD(movie.foreign)} ({movie.foreignRate})
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-zinc-400">
+                  {movie.isNew && (
+                    <span className="px-1 rounded bg-green-500/20 text-green-400">新</span>
+                  )}
+                  <span className="text-white">第{movie.days}天</span>
+                  <span>累计 {formatUSD(movie.toDate)}</span>
+                  <ChangeText label="较昨日" value={movie.changeDay} />
+                  <ChangeText label="较上周" value={movie.changeWeek} />
                 </div>
               </div>
             </div>
@@ -168,4 +199,4 @@ const GlobalBoxOfficeCard = async ({ label, name }: { label: string; name: strin
   );
 };
 
-export default GlobalBoxOfficeCard;
+export default BoxOfficeMojoDailyCard;
