@@ -4,51 +4,64 @@ import dayjs from 'dayjs';
 import { Card } from '../../src/components/ui/card';
 import { ScrollArea } from '../../src/components/ui/scroll-area';
 
-// 定义猫眼电影数据类型
+// 猫眼专业版实时票房接口原始数据类型
+interface MaoyanSplitUnit {
+  num: string;
+  unit: string;
+}
+
+interface MaoyanRawMovieItem {
+  avgSeatView: string;
+  boxRate: string;
+  boxSplitUnit: MaoyanSplitUnit;
+  movieInfo: {
+    movieId: number;
+    movieName: string;
+    releaseInfo: string;
+  };
+  showCountRate: string;
+  sumBoxDesc: string;
+}
+
+interface MaoyanRawResponse {
+  movieList: {
+    list: MaoyanRawMovieItem[];
+    nationBoxInfo: {
+      nationBoxSplitUnit: MaoyanSplitUnit;
+      showCountDesc: string;
+      viewCountDesc: string;
+    };
+    updateInfo: {
+      updateTimestamp: number;
+    };
+  };
+}
+
+// 组件使用的猫眼电影数据类型
 interface MaoyanMovieItem {
   movie_id: number;
   movie_name: string;
   release_info: string;
   box_office: string;
   box_office_unit: string;
-  box_office_desc: string;
   box_office_rate: string;
-  split_box_office: string;
-  split_box_office_unit: string;
-  split_box_office_desc: string;
-  split_box_office_rate: string;
-  show_count: number;
   show_count_rate: string;
-  avg_show_view: string;
   avg_seat_view: string;
   sum_box_desc: string;
-  sum_split_box_desc: string;
 }
 
 interface MaoyanMovieData {
-  code: number;
-  message: string;
   data: {
-    title: string;
     show_count_desc: string;
     view_count_desc: string;
-    split_box_office: string;
-    split_box_office_unit: string;
     box_office: string;
     box_office_unit: string;
-    update_gap_second: number;
-    updated: string;
     updated_at: number;
     list: MaoyanMovieItem[];
   };
 }
 
-interface MaoyanMovieCardProps {
-  label: string;
-  name: string;
-}
-
-export const formatTime = (timestamp?: string) => {
+export const formatTime = (timestamp?: string | number) => {
   if (!timestamp) return '';
   const date = dayjs(timestamp);
   const now = dayjs();
@@ -72,7 +85,12 @@ export const formatTime = (timestamp?: string) => {
 // 服务端获取猫眼电影数据
 async function getMaoyanMovieData(): Promise<MaoyanMovieData | null> {
   try {
-    const response = await fetch('https://60s.viki.moe/v2/maoyan/realtime/movie', {
+    const response = await fetch('https://piaofang.maoyan.com/dashboard-ajax/movie?orderType=0', {
+      headers: {
+        referer: 'https://piaofang.maoyan.com/dashboard',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      },
       next: { revalidate: 300 } // 5分钟重新验证
     });
 
@@ -80,8 +98,28 @@ async function getMaoyanMovieData(): Promise<MaoyanMovieData | null> {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data: MaoyanMovieData = await response.json();
-    return data;
+    const { movieList }: MaoyanRawResponse = await response.json();
+    const { nationBoxInfo } = movieList;
+    return {
+      data: {
+        show_count_desc: nationBoxInfo.showCountDesc,
+        view_count_desc: nationBoxInfo.viewCountDesc,
+        box_office: nationBoxInfo.nationBoxSplitUnit.num,
+        box_office_unit: nationBoxInfo.nationBoxSplitUnit.unit,
+        updated_at: movieList.updateInfo.updateTimestamp,
+        list: movieList.list.map((item) => ({
+          movie_id: item.movieInfo.movieId,
+          movie_name: item.movieInfo.movieName,
+          release_info: item.movieInfo.releaseInfo,
+          box_office: item.boxSplitUnit.num,
+          box_office_unit: item.boxSplitUnit.unit,
+          box_office_rate: item.boxRate,
+          show_count_rate: item.showCountRate,
+          avg_seat_view: item.avgSeatView,
+          sum_box_desc: item.sumBoxDesc,
+        })),
+      },
+    };
   } catch (error) {
     console.error('获取猫眼电影数据失败:', error);
     return null;
@@ -120,7 +158,7 @@ const MaoyanMovieCard = async ({ label, name }: { label: string; name: string })
 
   // 只取前20条数据
   const topMovies = movieData.data.list.slice(0, 20);
-  const date = formatTime(movieData.data.updated_at.toString());
+  const date = formatTime(movieData.data.updated_at);
 
   return (
     <Card className="w-full max-w-2xl bg-zinc-900 text-white">

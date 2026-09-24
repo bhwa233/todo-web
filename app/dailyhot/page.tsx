@@ -1,6 +1,7 @@
 import React from 'react';
 import DailyHotCard from './DailyHotCard';
 import MaoyanMovieCard from './MaoyanMovieCard';
+import GlobalBoxOfficeCard from './GlobalBoxOfficeCard';
 import HackerNewsCard from './HackerNewsCard';
 import { news } from './dailyhotConfig';
 import {
@@ -59,6 +60,8 @@ const adaptWeiboData = (weiboData: IWeiboResponse): IRootObject => {
 };
 
 export const dynamic = 'force-dynamic';
+// 猫眼接口可能屏蔽海外 IP，优先部署到香港区域
+export const preferredRegion = 'hkg1';
 
 // 根据类型获取数据的函数
 const getHotListByType = async (type: string) => {
@@ -87,15 +90,15 @@ const getHotListByType = async (type: string) => {
   else if (type === 'zhihu') {
     return getZhihuTopics();
   }
-  // 处理猫眼电影 - 返回一个空的数据结构，因为实际数据由客户端组件获取
-  else if (type === 'maoyan-movie') {
+  // 处理猫眼电影、全球票房 - 返回一个空的数据结构，因为实际数据由专用卡片组件获取
+  else if (type === 'maoyan-movie' || type === 'global-boxoffice') {
     return {
       code: 200,
       message: '获取数据成功',
-      name: 'maoyan-movie',
-      title: '猫眼电影',
-      subtitle: '实时票房',
-      from: 'maoyan-movie',
+      name: type,
+      title: type === 'maoyan-movie' ? '猫眼电影' : '全球票房',
+      subtitle: type === 'maoyan-movie' ? '实时票房' : '全球年度票房榜',
+      from: type,
       total: 0,
       updateTime: Date.now().toString(),
       data: [],
@@ -169,6 +172,15 @@ const DailyHot = async () => {
             return (
               <div className="w-full overflow-auto" key={item.name}>
                 <MaoyanMovieCard label={item.label} name={item.name} />
+              </div>
+            );
+          }
+
+          // 对于全球票房，使用专用的卡片组件
+          if (item.name === 'global-boxoffice') {
+            return (
+              <div className="w-full overflow-auto" key={item.name}>
+                <GlobalBoxOfficeCard label={item.label} name={item.name} />
               </div>
             );
           }

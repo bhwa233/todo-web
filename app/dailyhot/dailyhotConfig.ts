@@ -4,6 +4,10 @@ export const news = [
     name: 'maoyan-movie',
   },
   {
+    label: '全球票房',
+    name: 'global-boxoffice',
+  },
+  {
     label: 'Hacker News',
     name: 'hackernews',
   },

@@ -40,45 +40,6 @@ export interface ZhihuTopicResponse {
   data: ZhihuTopicItem[];
 }
 
-// 猫眼电影API相关接口
-export interface MaoyanMovieItem {
-  movie_id: number;
-  movie_name: string;
-  release_info: string;
-  box_office: string;
-  box_office_unit: string;
-  box_office_desc: string;
-  box_office_rate: string;
-  split_box_office: string;
-  split_box_office_unit: string;
-  split_box_office_desc: string;
-  split_box_office_rate: string;
-  show_count: number;
-  show_count_rate: string;
-  avg_show_view: string;
-  avg_seat_view: string;
-  sum_box_desc: string;
-  sum_split_box_desc: string;
-}
-
-export interface MaoyanMovieResponse {
-  code: number;
-  message: string;
-  data: {
-    title: string;
-    show_count_desc: string;
-    view_count_desc: string;
-    split_box_office: string;
-    split_box_office_unit: string;
-    box_office: string;
-    box_office_unit: string;
-    update_gap_second: number;
-    updated: string;
-    updated_at: number;
-    list: MaoyanMovieItem[];
-  };
-}
-
 // 每日新闻API相关接口
 export interface DailyNewsItem {
   date: string;
