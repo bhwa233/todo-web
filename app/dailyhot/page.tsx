@@ -1,7 +1,7 @@
 import React from 'react';
 import DailyHotCard from './DailyHotCard';
 import MaoyanMovieCard from './MaoyanMovieCard';
-import BoxOfficeMojoDailyCard from './BoxOfficeMojoDailyCard';
+import BoxOfficeMojoWeekendCard from './BoxOfficeMojoWeekendCard';
 import HackerNewsCard from './HackerNewsCard';
 import { news } from './dailyhotConfig';
 import {
@@ -90,14 +90,14 @@ const getHotListByType = async (type: string) => {
   else if (type === 'zhihu') {
     return getZhihuTopics();
   }
-  // 处理猫眼电影、北美日票房 - 返回一个空的数据结构，因为实际数据由专用卡片组件获取
-  else if (type === 'maoyan-movie' || type === 'boxoffice-daily') {
+  // 处理猫眼电影、北美周末票房 - 返回一个空的数据结构，因为实际数据由专用卡片组件获取
+  else if (type === 'maoyan-movie' || type === 'boxoffice-weekend') {
     return {
       code: 200,
       message: '获取数据成功',
       name: type,
-      title: type === 'maoyan-movie' ? '猫眼电影' : '北美日票房',
-      subtitle: type === 'maoyan-movie' ? '实时票房' : 'Box Office Mojo 北美日票房',
+      title: type === 'maoyan-movie' ? '猫眼电影' : '北美周末票房',
+      subtitle: type === 'maoyan-movie' ? '实时票房' : 'Box Office Mojo 北美周末票房',
       from: type,
       total: 0,
       updateTime: Date.now().toString(),
@@ -176,11 +176,11 @@ const DailyHot = async () => {
             );
           }
 
-          // 对于北美日票房，使用专用的卡片组件
-          if (item.name === 'boxoffice-daily') {
+          // 对于北美周末票房，使用专用的卡片组件
+          if (item.name === 'boxoffice-weekend') {
             return (
               <div className="w-full overflow-auto" key={item.name}>
-                <BoxOfficeMojoDailyCard label={item.label} name={item.name} />
+                <BoxOfficeMojoWeekendCard label={item.label} name={item.name} />
               </div>
             );
           }

@@ -4,8 +4,8 @@ export const news = [
     name: 'maoyan-movie',
   },
   {
-    label: '北美日票房',
-    name: 'boxoffice-daily',
+    label: '北美周末票房',
+    name: 'boxoffice-weekend',
   },
   {
     label: 'Hacker News',
