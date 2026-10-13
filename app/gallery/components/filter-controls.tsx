@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import useConfigStore from '../../../store/config'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -42,6 +42,7 @@ export function FilterControls({
   initialState
 }: FilterControlsProps) {
   const router = useRouter()
+  const [isPending, startTransition] = useTransition()
   const searchParams = useSearchParams()
   const [isProducerDialogOpen, setIsProducerDialogOpen] = useState(false)
   const { role } = useConfigStore()
@@ -59,8 +60,10 @@ export function FilterControls({
     })
 
     const newUrl = params.toString() ? `?${params.toString()}` : '/gallery'
-    router.push(newUrl, { scroll: false })
-  }, [router, searchParams])
+    startTransition(() => {
+      router.push(newUrl, { scroll: false })
+    })
+  }, [router, searchParams, startTransition])
 
   // 获取当前选中的生产者信息
   const selectedProducer = initialState.producer
@@ -74,11 +77,12 @@ export function FilterControls({
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4" aria-busy={isPending}>
         {/* 生产者筛选 */}
         <div className="space-y-2">
           <label className="text-sm font-medium">生产者</label>
           <Select
+            disabled={isPending}
             value={initialState.producer || 'all'}
             onValueChange={(value) => updateSearchParams({ producer: value === 'all' ? null : value })}
           >
@@ -100,6 +104,7 @@ export function FilterControls({
         <div className="space-y-2">
           <label className="text-sm font-medium">排序</label>
           <Select
+            disabled={isPending}
             value={initialState.sort}
             onValueChange={(value) => updateSearchParams({ sort: value })}
           >
@@ -118,6 +123,7 @@ export function FilterControls({
         <div className="space-y-2">
           <label className="text-sm font-medium">类型</label>
           <Select
+            disabled={isPending}
             value={initialState.type}
             onValueChange={(value) => updateSearchParams({ type: value })}
           >
@@ -136,6 +142,7 @@ export function FilterControls({
         <div className="space-y-2">
           <label className="text-sm font-medium">标签</label>
           <Select
+            disabled={isPending}
             value={initialState.tags?.[0] || 'all'}
             onValueChange={(value) => updateSearchParams({ tags: value === 'all' ? null : value })}
           >
@@ -169,7 +176,8 @@ export function FilterControls({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => router.push('/gallery')}
+              disabled={isPending}
+              onClick={() => startTransition(() => router.push('/gallery'))}
             >
               重置
             </Button>
@@ -205,7 +213,7 @@ export function FilterControls({
 
         {/* 右侧：状态信息 */}
         <div className="flex gap-4 text-sm text-muted-foreground lg:ml-auto">
-          <span>共 {total} 项</span>
+          <span role="status" aria-live="polite">{isPending ? '正在加载…' : `共 ${total} 项`}</span>
           <span>已上传: {stats.uploaded}</span>
           <span>待处理: {stats.pending}</span>
         </div>

@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
 import { useRequest } from 'ahooks'
 import { PhotoProvider } from 'react-photo-view'
 import { getPics } from '@/api/gallery/media'
@@ -21,7 +20,6 @@ interface GalleryClientProps {
   total: number
   pageSize: number
   initialSeed?: number
-  loadMorePageSize?: number
 }
 
 export function GalleryClient({ 
@@ -29,48 +27,14 @@ export function GalleryClient({
   initialState, 
   total, 
   pageSize,
-  initialSeed,
-  loadMorePageSize = 40
+  initialSeed
 }: GalleryClientProps) {
-  const searchParams = useSearchParams()
   const [images, setImages] = useState(initialImages)
-  // Page state is kept for potential URL syncing but not used for fetching anymore
-  const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(initialImages.length < total)
   const isLoadingMoreRef = useRef(false)
   const observerRef = useRef<HTMLDivElement>(null)
   
-  // 保持 seed 在客户端的持久化，但允许服务端更新它
-  const seedRef = useRef(initialSeed)
-
-  // 当服务端返回新的 seed 时（例如刷新页面或参数改变导致 RSC 重运行），更新 ref
-  useEffect(() => {
-    seedRef.current = initialSeed
-  }, [initialSeed])
-
-  // 当URL参数变化时重置数据
-  useEffect(() => {
-    const currentProducer = searchParams.get('producer')
-    const currentSort = searchParams.get('sort') || 'desc'
-    const currentType = searchParams.get('type') || MediaType.image
-    const currentTags = searchParams.get('tags')
-
-    // 检查参数是否发生变化
-    const paramsChanged = 
-      currentProducer !== initialState.producer ||
-      currentSort !== initialState.sort ||
-      currentType !== initialState.type ||
-      (currentTags || null) !== (initialState.tags?.[0] || null)
-
-    if (paramsChanged) {
-      // 参数变化时，重新加载数据将由服务端处理
-      // 这里只需要重置客户端状态
-      setImages(initialImages)
-      setPage(1)
-      setHasMore(initialImages.length < total)
-      isLoadingMoreRef.current = false
-    }
-  }, [searchParams, initialImages, initialState, total])
+  // 父组件按筛选条件和随机种子重建图库，分页沿用本次服务端结果的条件。
 
   // 加载更多数据的请求
   const { run: loadMore, loading: loadingMore } = useRequest(
@@ -79,29 +43,25 @@ export function GalleryClient({
       
       isLoadingMoreRef.current = true
       
-      const producer = searchParams.get('producer')
-      const sort = (searchParams.get('sort') || 'desc') as 'asc' | 'desc' | 'random'
-      const type = (searchParams.get('type') || MediaType.image) as MediaType
-      const tags = searchParams.get('tags') ? [searchParams.get('tags')!] : null
-      
+      const { producer, sort, type, tags } = initialState
+
       // Calculate skip based on current loaded images
       const currentCount = images.length;
       
       // Use explicit skip for pagination to handle mixed page sizes (100 initial -> 40 subsequent)
       const newImages = await getPics(
         1, // page (ignored when skip is present)
-        loadMorePageSize, // pageSize for this batch
+        pageSize, // pageSize for this batch
         producer, 
         sort, 
         type, 
         tags, 
-        seedRef.current,
+        initialSeed,
         currentCount // explicitSkip
       )
       
       setImages(prev => [...prev, ...newImages])
-      setPage(prev => prev + 1)
-      setHasMore(images.length + newImages.length < total)
+      setHasMore(currentCount + newImages.length < total)
       isLoadingMoreRef.current = false
       
       return newImages
@@ -140,14 +100,6 @@ export function GalleryClient({
     }
   }, [hasMore, loadingMore, loadMore])
 
-  // 生成唯一的key
-  const generateKey = useCallback((image: any, index: number) => {
-    const producer = searchParams.get('producer') || 'all'
-    const sort = searchParams.get('sort') || 'desc'
-    const type = searchParams.get('type') || MediaType.image
-    return `${image.id}-${producer}-${sort}-${type}-${index}`
-  }, [searchParams])
-
   return (
     <div className="flex-1 p-2">
       <PhotoProvider
@@ -184,7 +136,7 @@ export function GalleryClient({
             }
           `}</style>
           {images.map((image, index) => (
-            <div key={generateKey(image, index)} className="mb-2 break-inside-avoid">
+            <div key={image.id} className="mb-2 break-inside-avoid">
               <GalleryItem
                 image={image}
                 index={index}

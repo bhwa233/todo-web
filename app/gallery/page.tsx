@@ -107,6 +107,7 @@ export default async function GalleryPage({ searchParams }: GalleryPageProps) {
       {/* 客户端渲染的图片网格 */}
       <Suspense fallback={<GalleryLoadingSkeleton />}>
         <GalleryClient 
+          key={JSON.stringify([producer, sort, type, tags, seed])}
           initialImages={initialImages}
           initialState={initialState}
           total={total}
