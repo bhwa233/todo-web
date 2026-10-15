@@ -24,6 +24,7 @@
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@modelcontextprotocol/server": "2.3.1",
     "@mui/lab": "7.0.0-beta.12",
     "@mui/material": "^7.3.9",
     "@mui/material-nextjs": "^7.3.9",
@@ -79,6 +80,7 @@
     "use-immer": "^0.11.0",
     "vaul": "^1.1.2",
     "vitest": "^3.2.6",
+    "zod": "4.3.6",
     "zustand": "^5.0.12",
     "zustand-middleware-computed": "^1.2.1"
   },

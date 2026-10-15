@@ -24,6 +24,8 @@ bun start
 
 ## 功能特性
 
+- **Gallery 配置 MCP**：通过 OpenClaw 等 agent 管理采集来源及标签，支持平台 ID、完整链接和官方短链接。配置方法见 [Gallery MCP 文档](docs/gallery-mcp.md)。
+
 ### 核心功能
 - **用户认证**
   - 安全的登录和登出功能

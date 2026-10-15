@@ -1,14 +1,15 @@
 import { Producer, ProducerType } from '@prisma/client';
 
-export type UpdateProducer = Pick<
-  Producer,
-  'id' | 'name' | 'type' | 'producerId'
->;
+export type UpdateProducer = Pick<Producer, 'id'> &
+  Partial<Pick<Producer, 'name' | 'type' | 'producerId'>> & {
+    tagIds?: string[];
+  };
 
 export type NewProducer = {
   name: string | null;
   type: ProducerType;
   producerId: string;
+  tagIds?: string[];
 };
 
 export const PRODUCER_TYPE_NAMES: Record<ProducerType, string> = {

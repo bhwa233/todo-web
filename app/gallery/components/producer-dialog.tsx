@@ -17,7 +17,6 @@ import {
   updateProducer,
   createProducer,
   deleteProducer,
-  updateProducerTags,
 } from '@/api/gallery/producer';
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, AlertCircle } from 'lucide-react';
@@ -207,6 +206,7 @@ export function ProducerDialog({
           type: data.type,
           producerId: data.producerId,
           editCode,
+          tagIds: data.tags.map((tag) => tag.id),
         });
       } else {
         // Edit mode
@@ -216,15 +216,8 @@ export function ProducerDialog({
           type: data.type,
           producerId: data.producerId,
           editCode,
+          tagIds: data.tags.map((tag) => tag.id),
         });
-
-        if (data.tags) {
-          await updateProducerTags(
-            editingProducer!.id,
-            data.tags.map((t) => t.id),
-            editCode,
-          );
-        }
       }
 
       onSuccess?.();

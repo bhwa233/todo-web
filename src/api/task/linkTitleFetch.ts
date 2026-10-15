@@ -148,13 +148,17 @@ export async function readPageTitle(stream: Readable, contentType: string) {
   );
 }
 
-export async function fetchPageTitle(input: string): Promise<string | null> {
+export async function fetchPageMetadata(
+  input: string,
+  validateUrl?: (url: URL) => void,
+): Promise<{ url: string; title: string | null } | null> {
   let url = publicPageUrl(input);
   const httpAgent = new HttpAgent({ lookup: publicLookup });
   const httpsAgent = new HttpsAgent({ lookup: publicLookup });
   const signal = AbortSignal.timeout(7000);
   try {
     for (let redirects = 0; redirects <= 3; redirects++) {
+      validateUrl?.(url);
       const response = await axios.get<Readable>(url.href, {
         adapter: 'http',
         proxy: false,
@@ -183,13 +187,17 @@ export async function fetchPageTitle(input: string): Promise<string | null> {
         !/^(text\/html|application\/xhtml\+xml)\b/i.test(type)
       ) {
         response.data.destroy();
-        return null;
+        return { url: url.href, title: null };
       }
-      return await readPageTitle(response.data, type);
+      return { url: url.href, title: await readPageTitle(response.data, type) };
     }
     return null;
   } finally {
     httpAgent.destroy();
     httpsAgent.destroy();
   }
+}
+
+export async function fetchPageTitle(input: string): Promise<string | null> {
+  return (await fetchPageMetadata(input))?.title ?? null;
 }

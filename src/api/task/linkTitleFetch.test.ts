@@ -4,6 +4,7 @@ import axios from 'axios';
 import { lookup } from 'node:dns';
 import {
   fetchPageTitle,
+  fetchPageMetadata,
   isPublicAddress,
   publicLookup,
   publicPageUrl,
@@ -98,6 +99,30 @@ it('checks redirect destinations before making another request', async () => {
   await expect(fetchPageTitle('https://example.com')).rejects.toThrow();
   expect(axios.get).toHaveBeenCalledTimes(1);
   expect(stream.destroyed).toBe(true);
+});
+
+it('applies caller host restrictions on every redirect and preserves the final URL on blocked pages', async () => {
+  vi.mocked(axios.get).mockResolvedValueOnce({
+    status: 302,
+    headers: { location: 'https://untrusted.example/profile' },
+    data: Readable.from([]),
+  });
+  await expect(
+    fetchPageMetadata('https://t.cn/example', (url) => {
+      if (!['t.cn', 'weibo.com'].includes(url.hostname))
+        throw new Error('Unsupported host');
+    }),
+  ).rejects.toThrow('Unsupported host');
+  expect(axios.get).toHaveBeenCalledTimes(1);
+  vi.mocked(axios.get).mockResolvedValueOnce({
+    status: 403,
+    headers: { 'content-type': 'text/html' },
+    data: Readable.from([]),
+  });
+  expect(await fetchPageMetadata('https://weibo.com/u/123')).toEqual({
+    url: 'https://weibo.com/u/123',
+    title: null,
+  });
 });
 
 it('replaces fake proxy DNS with a verified public answer and still rejects private resolver answers', async () => {
