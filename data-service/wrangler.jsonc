@@ -40,6 +40,14 @@
   "env": {
     "production": {
       "name": "todo-data-service",
+      "secrets": {
+        "required": [
+          "SPIDER_API_TOKEN",
+          "AI_BASE_URL",
+          "AI_MODEL",
+          "AI_API_KEY",
+        ],
+      },
       "vars": {
         "READ_ONLY": "true",
         "ALLOW_LOCAL_HTTP_WEB_API": "false",
