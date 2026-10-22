@@ -70,7 +70,7 @@
 
 ## 实际验收证据
 
-- 网站类型检查、数据 Worker 类型检查、ESLint、预览构建通过；生产环境构建选择也已验证。
+- 网站类型检查、数据 Worker 类型检查、ESLint、预览构建通过；生产环境构建选择也已验证。两个 Workers 的首次 Git push 自动构建和部署均已成功。
 - 网站 Vitest：13 文件、46 项通过，包含 10 项真实本地 D1 集成检查。
 - galaxy-spider：TypeScript 通过；6 个不依赖外部微博登录态的回归文件、27 项通过。
 - 爬虫全套网络测试有 4 项失败、15 项跳过：现有微博登录态/反爬及共享浏览器上下文相关，不能宣称真实 GHA 采集通过。
@@ -78,6 +78,8 @@
 - 真实 CF 队列生成 Task 标签和 Bookmark 摘要并写回 D1；润色返回多种风格；失败任务重试后完成。
 - MCP 真实读取与创建标签成功；缺少 Bearer 凭据返回 401。
 - 爬虫 token 可读取真实预览来源、正确反序列化 Date；尝试查询网站 Task 返回 403。
+- 链接标题真实返回 Example Domain；loopback IP 被拒绝，解析为 loopback 的域名不发起页面请求。使用 CF 原生公网 fetch、DoH 地址筛查和逐跳重定向检查，保持私网隔离；非 HTML 或上游失败时返回 title=null。
+- 清理已知 QA 记录、队列任务和无引用的自动标签后，再次远程导出校验，16 张原始表全部哈希仍与源快照相同。
 - 伪造/图库角色跨路由请求管理员 Server Action 未产生数据写入。vinext 的跨路由转发拒绝可能返回 200 `{}`，不能仅以状态码作为写入成功依据。
 - 浏览器 Service Worker 已接管，只有静态 precache；检查未发现任务/书签/认证响应进入缓存。通过 CDP 同时切断页面和 Service Worker 网络，硬导航成功显示“暂时离线”。单独设置页面 offline 不影响 Service Worker 自身网络，不能用来证明离线行为。
 
@@ -95,11 +97,15 @@ Workers Builds 已连接 bhwa233/todo-web，仅匹配 feature/cloudflare-d1：
 - 数据触发器：`b716e0d3-e1fe-468a-8f0d-ff0fe330dc6c`，pnpm data:generate / Wrangler 预览部署。
 - Node 24.15.0、pnpm 11.1.0；生产自动构建尚未启用。
 
-完整导出、私密凭据、备份与原始日志位于 Git 忽略的 `.migration/`，不得提交到仓库。
+完整导出、私密凭据、备份与原始日志位于 Git 忽略的 `.migration/`，不得提交到仓库。私有 R2 已保存 source.tar.gz、verification.json；清理后的再次验证报告保存在本地 target-08d82e46-8382-48d8-a6e9-426413635c13。
 操作步骤见 [运行与回退手册](d1-migration.md)。
 
 ## 正式切换前剩余门槛
 
 生产维护窗口尚未开始：最终停写快照、正式导入、域名、正式 Secrets、爬虫写入端切换以及真实 GHA 采集必须在窗口内完成。
 预览模型替换目前仅获预览授权，正式 AI_MODEL 需随切换确认。
-离线降级、链接标题的 CF 网络兼容性和首次远程 Git 构建结果正在补充验收，完成前不将生产状态标为就绪。
+预览的离线降级、链接标题与首次远程 Git 构建已通过；正式切换仍需完成本节所列生产窗口门槛。
+
+外部依赖保留清单：阶跃星辰模型、原媒体/上传服务、SparkHub 命令 API、热点内容聚合服务（hot-api-bhwa233.vercel.app）、既有天气/资讯源，以及导航中的外部独立网站。本次迁移不改变这些独立服务的托管。
+
+SSRF 平台边界依据：[workerd 维护者关于公网 fetch 与私网 Service Binding 隔离的说明](https://github.com/cloudflare/workerd/discussions/1523)。不得将该抓取器改接到允许私网出站的绑定。

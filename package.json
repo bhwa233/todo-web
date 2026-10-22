@@ -78,7 +78,6 @@
     "dayjs": "^1.11.20",
     "decimal.js": "^10.6.0",
     "htmlparser2": "12.0.0",
-    "http-parser-js": "0.5.10",
     "immer": "^10.2.0",
     "ipaddr.js": "2.5.0",
     "jose": "6.2.13",
