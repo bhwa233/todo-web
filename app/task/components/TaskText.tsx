@@ -26,8 +26,8 @@ function TaskLink({
         `/api/task/link-title?${new URLSearchParams({ url: details.pageUrl })}`,
       );
       if (!response.ok) return null;
-      const result = await response.json();
-      return typeof result.title === 'string' ? result.title : null;
+      const result: unknown = await response.json();
+      return typeof result === 'object' && result !== null && 'title' in result && typeof result.title === 'string' ? result.title : null;
     },
     {
       ready: !!visible && !details.preferredTitle,

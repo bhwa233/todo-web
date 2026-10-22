@@ -1,25 +1,28 @@
 # Todo Web 应用
 
-一个基于 Next.js 构建的功能丰富的 Web 应用，集成了生产力工具和娱乐功能。使用 Bun 作为运行时和包管理器，提供更快的开发体验。
+网站采用 vinext + Vite 部署至 Cloudflare Workers，通过内部 Service Binding 访问独立 D1 数据服务；爬虫仍在 GitHub Actions。
+本地运行、全量数据迁移与维护窗口切换步骤见 [D1 迁移说明](docs/d1-migration.md)。
+
+一个兼容 Next.js App Router 的 Web 应用，集成生产力工具、图库和 MCP。使用 pnpm 管理依赖。
 
 ## 开发环境
 
 ### 环境要求
-- [Bun](https://bun.sh/) >= 1.0.0
+- Node.js 22.18+（迁移工具使用 node:sqlite），pnpm 11.1.0
 
 ### 快速开始
 ```bash
 # 安装依赖
-bun install
+pnpm install --frozen-lockfile
 
 # 开发环境运行
-bun dev
+pnpm dev
 
 # 构建
-bun run build
+pnpm build
 
 # 生产环境运行
-bun start
+pnpm preview
 ```
 
 ## 功能特性
@@ -51,8 +54,9 @@ bun start
 ## 技术栈
 
 ### 前端
-- Bun - JavaScript 运行时和包管理器
-- Next.js
+- vinext + Vite + React
+- Cloudflare Workers / D1 / Queues / R2 备份
+- pnpm
 - [zustand-middleware-computed](https://github.com/lxw15337674/zustand-middleware-computed) - 状态管理
 
 ## 项目链接

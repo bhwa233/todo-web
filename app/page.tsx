@@ -1,23 +1,9 @@
 import Link from 'next/link'
-import { cookies } from 'next/headers'
-import { Apps, Links, canAccessApp, type Role } from './RouterConfig'
+import { currentRole } from '../src/lib/auth'
+import { Apps, Links, canAccessApp } from './RouterConfig'
 
 export default async function Home() {
-  const adminCode = process.env.EDIT_CODE;
-  const galleryCode = process.env.GALLERY_EDIT_CODE;
-  let role: Role = 'none';
-
-  if (!adminCode && !galleryCode) {
-    role = 'admin';
-  } else {
-    const cookieStore = await cookies();
-    const cookieRole = cookieStore.get('auth_role')?.value;
-    if (cookieRole === 'admin' || cookieRole === 'gallery') {
-      role = cookieRole;
-    } else if (!cookieRole && cookieStore.has('auth_token') && adminCode) {
-      role = 'admin';
-    }
-  }
+  const role = await currentRole();
 
   const visibleApps = Apps.filter((app) => canAccessApp(app, role));
 

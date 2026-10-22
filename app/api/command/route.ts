@@ -1,8 +1,9 @@
+import { z } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { command } = await request.json();
+    const { command } = z.object({ command: z.string().trim().min(1).max(10000) }).parse(await request.json());
 
     if (!command) {
       return NextResponse.json({
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
         type: 'text'
       }, { status: 400 });
     }
-    const upstreamUrl = new URL('/bhwa233-api/command', request.nextUrl.origin);
+    const upstreamUrl = new URL('https://api.bhwa233.com/api/command');
     upstreamUrl.searchParams.set('command', command);
 
     const response = await fetch(upstreamUrl, {

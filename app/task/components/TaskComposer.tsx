@@ -1,5 +1,6 @@
 'use client';
 
+import { AiJobControl } from '@/components/ai-job-control';
 import { useRef, useState } from 'react';
 import { Priority } from '@prisma/client';
 import { Loader2, Plus, Save } from 'lucide-react';
@@ -241,6 +242,7 @@ export default function TaskComposer({
             />
           </fieldset>
           <DialogFooter className="gap-2 sm:gap-0">
+            {task && <AiJobControl targetId={task.id} disabled={creating} />}
             <Button
               type="button"
               variant="outline"

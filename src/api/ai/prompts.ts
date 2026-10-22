@@ -20,7 +20,7 @@ export const bookmarkPrompt = (content: string, existedTags: string[]) => `
    - 如无合适标签可返回空数组
 
 请以JSON格式返回，包含以下字段：
-{"summary": "内容总结","tags": ["标签1", "标签2", ...]}
+{"title": "文章标题", "summary": "内容总结","tags": ["标签1", "标签2", ...]}
 `;
 
 export const taskPrompt = (text: string, existedTags: string[]) => `
@@ -49,14 +49,14 @@ export const taskPrompt = (text: string, existedTags: string[]) => `
 `;
 
 const styles = [
-   "更专业",
-   "更易读",
-   "更含蓄",
-   "更有信息量",
-   "更有文采",
-   "更正式",
-   "更简洁",
-   "更委婉",
+  '更专业',
+  '更易读',
+  '更含蓄',
+  '更有信息量',
+  '更有文采',
+  '更正式',
+  '更简洁',
+  '更委婉',
 ];
 
 // 文本润色

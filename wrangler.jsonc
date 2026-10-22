@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "todo-web-preview",
+  "main": "vinext/server/fetch-handler",
+  "compatibility_date": "2026-10-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "assets": {
+    "directory": "dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "none",
+  },
+  "services": [
+    {
+      "binding": "TODO_DATA",
+      "service": "todo-data-service-preview",
+      "entrypoint": "TodoDataService",
+    },
+  ],
+  "vars": { "APP_ENV": "preview" },
+  "observability": { "enabled": true },
+  "env": {
+    "production": {
+      "name": "todo-web",
+      "services": [
+        {
+          "binding": "TODO_DATA",
+          "service": "todo-data-service",
+          "entrypoint": "TodoDataService",
+        },
+      ],
+      "vars": { "APP_ENV": "production" },
+      "routes": [],
+    },
+  },
+}

@@ -1,7 +1,6 @@
-import type { Prisma } from '@prisma/client';
 import type { Task } from './taskActions';
 
-export const COMPLETED_PAGE_SIZE = 20;
+export { COMPLETED_PAGE_SIZE } from '../../data/commands';
 export interface CompletedTaskQuery {
   search: string;
   tag: string;
@@ -18,53 +17,6 @@ export interface CompletedTaskSummary {
 export interface CompletedTaskPage {
   items: Task[];
   nextCursor: CompletedTaskCursor | null;
-}
-
-export function completedTaskWhere(
-  query: CompletedTaskQuery,
-): Prisma.TaskWhereInput {
-  const search = query.search.trim().replace(/[\\%_]/g, '\\$&');
-  return {
-    deletedAt: null,
-    status: query.status === 'all' || query.status === '1' ? '1' : { in: [] },
-    ...(query.tag === 'untagged'
-      ? { tags: { none: { deletedAt: null } } }
-      : query.tag !== 'all'
-        ? { tags: { some: { id: query.tag, deletedAt: null } } }
-        : {}),
-    ...(search
-      ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' } },
-            { remark: { contains: search, mode: 'insensitive' } },
-            {
-              tags: {
-                some: {
-                  deletedAt: null,
-                  name: { contains: search, mode: 'insensitive' },
-                },
-              },
-            },
-          ],
-        }
-      : {}),
-  };
-}
-
-export function completedTaskCursorWhere(
-  cursor: CompletedTaskCursor,
-): Prisma.TaskWhereInput {
-  const updateTime = new Date(cursor.updateTime);
-  if (!cursor.id || Number.isNaN(updateTime.getTime()))
-    throw new Error('Invalid task cursor');
-  // Compare captured values, not a live cursor row: reopening or editing the
-  // last task in a page must not change where the next page starts.
-  return {
-    OR: [
-      { updateTime: { lt: updateTime } },
-      { updateTime, id: { lt: cursor.id } },
-    ],
-  };
 }
 
 export function matchesCompletedTask(

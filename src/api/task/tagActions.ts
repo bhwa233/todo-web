@@ -1,8 +1,10 @@
 'use server';
-import { PrismaClient, TaskTag as PrismaTaskTag } from '@prisma/client';
+import { requireAdmin } from '../../lib/auth';
+import { TaskTag as PrismaTaskTag } from '@prisma/client';
 import { getTaskTags } from '../ai/aiActions';
 
-const prisma = new PrismaClient();
+import prisma from '../prisma';
+import { callDataService } from '../../data/client';
 
 export type TaskTag = Omit<PrismaTaskTag, 'deletedAt'>;
 
@@ -12,6 +14,7 @@ export interface NewTaskTag {
 }
 
 export const fetchTaskTags = async (): Promise<TaskTag[]> => {
+  await requireAdmin();
   const tags = await prisma.taskTag.findMany({
     where: { deletedAt: null },
     orderBy: { createTime: 'desc' },
@@ -20,6 +23,7 @@ export const fetchTaskTags = async (): Promise<TaskTag[]> => {
 };
 
 export const createTaskTag = async (data: NewTaskTag): Promise<TaskTag> => {
+  await requireAdmin();
   const tag = await prisma.taskTag.create({
     data,
   });
@@ -28,6 +32,7 @@ export const createTaskTag = async (data: NewTaskTag): Promise<TaskTag> => {
 };
 
 export const deleteTaskTag = async (id: string): Promise<TaskTag> => {
+  await requireAdmin();
   const tag = await prisma.taskTag.update({
     where: { id },
     data: { deletedAt: new Date() },
@@ -40,39 +45,23 @@ export const updateTaskTags = async (
   taskId: string,
   tagIds: string[],
 ): Promise<void> => {
-  await prisma.task.update({
-    where: { id: taskId },
-    data: {
-      tags: {
-        set: tagIds.map((id) => ({ id })),
-      },
-    },
-  });
+  await requireAdmin();
+  await callDataService('task/tags', { id: taskId, tagIds });
 };
 
 // 生成任务标签,返回标签id
 export const generateTaskTags = async (content: string): Promise<TaskTag[]> => {
+  await requireAdmin();
   const existedTags = await fetchTaskTags();
   const tags = await getTaskTags(
     content,
     existedTags.map((tag) => tag.name),
   );
 
-  // 批量创建标签
-  await prisma.taskTag.createMany({
-    data: tags.map((tag) => ({ name: tag })),
-    skipDuplicates: true, // 避免重复创建
-  });
-
-  // 查询新创建的标签
-  const newTags = await prisma.taskTag.findMany({
-    where: {
-      name: {
-        in: tags,
-      },
-      deletedAt: null,
-    },
-  });
+  const newTags = await callDataService<PrismaTaskTag[]>(
+    'task/ensureTags',
+    tags,
+  );
 
   return newTags.map(({ deletedAt, ...tag }) => tag);
 };

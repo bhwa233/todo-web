@@ -1,3 +1,4 @@
+import { sessionRole, SESSION_COOKIE } from '@/lib/auth-session';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { aggregateAdminRequests } from '@/api/admin/aggregation';
@@ -76,23 +77,8 @@ class UpstreamMonitorError extends Error {
   }
 }
 
-const isAdminRequest = (request: NextRequest) => {
-  const hasAuthConfig = Boolean(
-    process.env.EDIT_CODE || process.env.GALLERY_EDIT_CODE,
-  );
-  if (!hasAuthConfig) {
-    return true;
-  }
-
-  const role = request.cookies.get('auth_role')?.value;
-  if (role === 'admin') {
-    return true;
-  }
-
-  return (
-    !role && Boolean(process.env.EDIT_CODE) && request.cookies.has('auth_token')
-  );
-};
+const isAdminRequest = async (request: NextRequest) =>
+  await sessionRole(request.cookies.get(SESSION_COOKIE)?.value) === 'admin';
 
 const toRecord = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -865,7 +851,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json(
       {
         success: false,

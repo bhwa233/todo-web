@@ -34,21 +34,21 @@
       }
     ],
     "types": [
-      // Other types...
-      // This allows Serwist to type `window.serwist`.
-      "@serwist/next/typings"
+      "node"
     ]
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    "next.config.ts",
-    ".next/dev/types/**/*.ts"
+    "data-service/worker-configuration.d.ts"
   ],
   "exclude": [
     "node_modules",
-    "public/sw.js"
+    "data-service",
+    ".migration",
+    "public/sw.js",
+    "dist",
+    ".next"
   ]
 }

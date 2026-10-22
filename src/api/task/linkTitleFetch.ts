@@ -152,6 +152,10 @@ export async function fetchPageMetadata(
   input: string,
   validateUrl?: (url: URL) => void,
 ): Promise<{ url: string; title: string | null } | null> {
+  if (process.env.APP_ENV === 'preview' || process.env.APP_ENV === 'production') {
+    const { fetchWorkerPageMetadata } = await import('./workerPageFetch');
+    return fetchWorkerPageMetadata(input, validateUrl);
+  }
   let url = publicPageUrl(input);
   const httpAgent = new HttpAgent({ lookup: publicLookup });
   const httpsAgent = new HttpsAgent({ lookup: publicLookup });

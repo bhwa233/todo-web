@@ -1,3 +1,4 @@
+import { sessionRole, SESSION_COOKIE } from './src/lib/auth-session';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -11,35 +12,19 @@ const ADMIN_ROUTES = [
   '/admin/monitor',
 ];
 
-export function proxy(request: NextRequest) {
-  // 1. 如果没有设置 EDIT_CODE 环境变量，直接放行
-  if (!process.env.EDIT_CODE && !process.env.GALLERY_EDIT_CODE) {
-    return NextResponse.next();
-  }
-
+export async function proxy(request: NextRequest) {
+  const role = await sessionRole(request.cookies.get(SESSION_COOKIE)?.value);
   const { pathname } = request.nextUrl;
-
-  // 2. 检查当前路径是否在受保护名单中
-  const isAdminRoute = ADMIN_ROUTES.some(route =>
-    pathname === route || pathname.startsWith(`${route}/`)
-  );
-  if (isAdminRoute) {
-    const role = request.cookies.get('auth_role')?.value;
-    const isAdmin = role === 'admin' || (!role && request.cookies.has('auth_token'));
-
-    if (isAdminRoute && !isAdmin) {
-      // 未登录或无管理员权限，跳转到登录页
-      const loginUrl = new URL('/login', request.url);
-      return NextResponse.redirect(loginUrl);
-    }
+  const previewPublic = pathname === '/login' || pathname.startsWith('/api/auth/') || pathname === '/api/mcp/gallery';
+  if (process.env.APP_ENV === 'preview' && role === 'none' && !previewPublic) {
+    return pathname.startsWith('/api/') ? NextResponse.json({ error: '需要登录' }, { status: 401, headers: { 'Cache-Control': 'private, no-store' } }) : NextResponse.redirect(new URL('/login', request.url));
   }
-
-  // 3. 如果是登录页且已经有 Cookie，自动跳转到首页
-  if (pathname === '/login' && (request.cookies.has('auth_role') || request.cookies.has('auth_token'))) {
-    return NextResponse.redirect(new URL('/', request.url));
-  }
-
-  return NextResponse.next();
+  const isAdminRoute = ADMIN_ROUTES.some(route => pathname === route || pathname.startsWith(`${route}/`));
+  if (isAdminRoute && role !== 'admin') return NextResponse.redirect(new URL('/login', request.url));
+  if (pathname === '/login' && role !== 'none') return NextResponse.redirect(new URL('/', request.url));
+  const response = NextResponse.next();
+  if (isAdminRoute || pathname === '/login' || pathname === '/') response.headers.set('Cache-Control', 'private, no-store');
+  return response;
 }
 
 export const config = {
@@ -47,6 +32,6 @@ export const config = {
     /*
      * 匹配所有路径，除了静态资源和 API
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|logo/|icons/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|logo/|icons/|sw.js|offline.html).*)',
   ],
 };
