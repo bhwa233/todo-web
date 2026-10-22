@@ -68,7 +68,7 @@ Media 的 230,154 行均为 UPLOADED。切换前必须重新统计，以最终�
 
 `CustomCommand` 已补入 Prisma 模型及 D1 迁移，19 条完整归档已通过全字段哈希校验，包括内嵌图片。严格导出器继续拒绝未知表和字段。
 
-代码核对还确认：
+以下为实施前的代码核对记录；当前实现与验收结果见实施记录：
 
 - 按当前仓库代码与部署配置，命令服务指向 SparkHub 的 Cloudflare Worker，使用 APP_DB 内的 `custom_commands`。
   它与旧 PostgreSQL 的 `CustomCommand` 是不同的表。用户已确认旧记录完整保存在新 todo D1，
