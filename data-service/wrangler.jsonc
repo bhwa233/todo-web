@@ -49,7 +49,7 @@
         ],
       },
       "vars": {
-        "READ_ONLY": "true",
+        "READ_ONLY": "false",
         "ALLOW_LOCAL_HTTP_WEB_API": "false",
         "WEB_API_TOKEN": "",
         "AI_PROMPT": "",

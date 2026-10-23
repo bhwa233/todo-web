@@ -30,7 +30,7 @@
         },
       ],
       "vars": { "APP_ENV": "production" },
-      "routes": [],
+      "routes": [{ "pattern": "own.bhwa233.com", "custom_domain": true }],
     },
   },
 }
