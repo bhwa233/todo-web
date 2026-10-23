@@ -1,6 +1,6 @@
 # todo-web 全站迁入 Cloudflare 与 D1 一次切换计划
 
-更新：2026-10-22。状态：已实施 CF 预览、全量数据演练与反向回滚演练；生产流量及正式数据源尚未切换。实测状态见 [实施记录](cloudflare-migration-validation.md)，操作命令见 [运行手册](d1-migration.md)。
+更新：2026-10-23。状态：正式站已在 Cloudflare 上线。最终快照、生产资源和验收结果见 [正式上线记录](cloudflare-production-release.md)，操作命令见 [运行手册](d1-migration.md)。
 
 ## 1. 目标与已经确认的范围
 

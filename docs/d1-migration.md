@@ -12,12 +12,12 @@
 | --- | --- | --- |
 | 网站 | todo-web-preview | todo-web |
 | 数据 Worker | todo-data-service-preview | todo-data-service |
-| D1 | todo-data-preview | todo-data |
+| D1 | todo-data-preview | todo-data-production |
 | AI 队列 | todo-ai-preview | todo-ai |
 | 失败队列 | todo-ai-failures-preview | todo-ai-failures |
 
-生产 D1 已创建并建表，尚未导入业务数据。生产域名未切换，旧库仍为现网数据源。
-生产配置 `READ_ONLY=true`；预览使用受登录保护的真实数据副本，允许验收写入。
+生产已正式上线，详情见 [上线记录](cloudflare-production-release.md)。正常生产配置 `READ_ONLY=false`，旧 PostgreSQL 保持只读。
+以下全量导入步骤用于受控迁移或新建空目标，不能重复导入现用生产库。预览使用受登录保护的独立副本。
 不要将预览库当作最终快照，也不要向非空正式库重复导入。
 
 ## 开发与检查
@@ -66,9 +66,9 @@ pnpm data:deploy:production
 
 构建和发布必须依次完成，不能一边重建 dist 一边上传。
 正式发布前检查 `dist/server/wrangler.json` 的 name=todo-web、APP_ENV=production、TODO_DATA=todo-data-service。
-源配置尚未添加正式路由，域名挂载留在最终维护窗口。
+正式源配置已包含 own.bhwa233.com 的 Custom Domain；生产发布会保持该绑定。
 Workers Builds 已为 feature/cloudflare-d1 配置网站与数据服务的预览触发器。
-生产分支的自动发布需在正式切换后开启，避免 main 的旧代码覆盖新资源。
+main 已开启生产自动发布；feature/cloudflare-d1 对应独立预览发布。
 
 ## 正式维护窗口
 
