@@ -65,11 +65,25 @@ if (
   );
 for (const file of manifest.files) {
   console.log(`Importing ${file}`);
-  execFileSync(
-    process.execPath,
-    [wrangler, ...targetArgs, '--file', join(directory, file)],
-    { stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 32 * 1024 * 1024 },
-  );
+  try {
+    execFileSync(
+      process.execPath,
+      [wrangler, ...targetArgs, '--file', join(directory, file)],
+      { stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 32 * 1024 * 1024 },
+    );
+  } catch (error) {
+    // Preserve the provider's complete diagnostics privately; the default
+    // child-process Error truncates stderr to a numeric Buffer dump.
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(
+      join(directory, 'import-failure.log'),
+      `${error.stdout?.toString() ?? ''}\n${error.stderr?.toString() ?? ''}`,
+      { mode: 0o600 },
+    );
+    throw new Error(
+      `Import failed at ${file}; keep writes paused and use a new empty target. Details: ${join(directory, 'import-failure.log')}`,
+    );
+  }
 }
 console.log(
   'Import finished. Keep writes paused and run pnpm data:verify before switching clients.',

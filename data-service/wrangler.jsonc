@@ -57,8 +57,8 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "todo-data",
-          "database_id": "9ba6758b-59b5-4454-bc14-6b94b1df7c63",
+          "database_name": "todo-data-production",
+          "database_id": "c68ad351-2e9e-4eb5-8636-40307c7a722a",
           "migrations_dir": "migrations",
         },
       ],
