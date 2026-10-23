@@ -1,0 +1,683 @@
+{
+  "tables": [
+    {
+      "name": "TrackMeta",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "type",
+          "type": "String"
+        },
+        {
+          "name": "remark",
+          "type": "String"
+        },
+        {
+          "name": "createTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "updateTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "deletedAt",
+          "type": "DateTime"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "TrackItem",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "remark",
+          "type": "String"
+        },
+        {
+          "name": "createTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "updateTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "countMetaId",
+          "type": "String"
+        },
+        {
+          "name": "deletedAt",
+          "type": "DateTime"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "Task",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "remark",
+          "type": "String"
+        },
+        {
+          "name": "createTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "updateTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "deletedAt",
+          "type": "DateTime"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "priority",
+          "type": "Priority"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "Bookmark",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "url",
+          "type": "String"
+        },
+        {
+          "name": "remark",
+          "type": "String"
+        },
+        {
+          "name": "createTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "updateTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "deletedAt",
+          "type": "DateTime"
+        },
+        {
+          "name": "image",
+          "type": "String"
+        },
+        {
+          "name": "summary",
+          "type": "String"
+        },
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "loading",
+          "type": "Boolean"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "BookmarkTag",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "remark",
+          "type": "String"
+        },
+        {
+          "name": "createTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "updateTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "deletedAt",
+          "type": "DateTime"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "Anniversary",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "remark",
+          "type": "String"
+        },
+        {
+          "name": "createTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "updateTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "deletedAt",
+          "type": "DateTime"
+        },
+        {
+          "name": "date",
+          "type": "DateTime"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "producer",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "createTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "updateTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "deletedAt",
+          "type": "DateTime"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "producerId",
+          "type": "String"
+        },
+        {
+          "name": "type",
+          "type": "ProducerType"
+        },
+        {
+          "name": "lastPostTime",
+          "type": "DateTime"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "Post",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "producerId",
+          "type": "String"
+        },
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "platform",
+          "type": "Platform"
+        },
+        {
+          "name": "platformId",
+          "type": "String"
+        },
+        {
+          "name": "createTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "updateTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "deletedAt",
+          "type": "DateTime"
+        },
+        {
+          "name": "status",
+          "type": "UploadStatus"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "Media",
+      "columns": [
+        {
+          "name": "id",
+          "type": "Int"
+        },
+        {
+          "name": "width",
+          "type": "Int"
+        },
+        {
+          "name": "height",
+          "type": "Int"
+        },
+        {
+          "name": "postId",
+          "type": "String"
+        },
+        {
+          "name": "originSrc",
+          "type": "String"
+        },
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "createTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "deletedAt",
+          "type": "DateTime"
+        },
+        {
+          "name": "updateTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "galleryMediaUrl",
+          "type": "String"
+        },
+        {
+          "name": "originMediaUrl",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "UploadStatus"
+        },
+        {
+          "name": "producerId",
+          "type": "String"
+        },
+        {
+          "name": "thumbnailUrl",
+          "type": "String"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "ProducerTag",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "remark",
+          "type": "String"
+        },
+        {
+          "name": "createTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "updateTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "deletedAt",
+          "type": "DateTime"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "TaskTag",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "remark",
+          "type": "String"
+        },
+        {
+          "name": "createTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "updateTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "deletedAt",
+          "type": "DateTime"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "_ProducerToProducerTag",
+      "columns": [
+        {
+          "name": "A",
+          "type": "String"
+        },
+        {
+          "name": "B",
+          "type": "String"
+        }
+      ],
+      "primaryKey": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "name": "Asset",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "amount",
+          "type": "Float"
+        },
+        {
+          "name": "date",
+          "type": "DateTime"
+        },
+        {
+          "name": "description",
+          "type": "String"
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime"
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "CustomCommand",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "ownerKeyHash",
+          "type": "String"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "command",
+          "type": "String"
+        },
+        {
+          "name": "description",
+          "type": "String"
+        },
+        {
+          "name": "replyType",
+          "type": "CustomCommandReplyType"
+        },
+        {
+          "name": "contentText",
+          "type": "String"
+        },
+        {
+          "name": "imageUrl",
+          "type": "String"
+        },
+        {
+          "name": "enabled",
+          "type": "Boolean"
+        },
+        {
+          "name": "sortOrder",
+          "type": "Int"
+        },
+        {
+          "name": "createTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "updateTime",
+          "type": "DateTime"
+        },
+        {
+          "name": "reviewComment",
+          "type": "String"
+        },
+        {
+          "name": "reviewedAt",
+          "type": "DateTime"
+        },
+        {
+          "name": "reviewerKeyHash",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "CustomCommandStatus"
+        },
+        {
+          "name": "submittedAt",
+          "type": "DateTime"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "_BookmarkToBookmarkTag",
+      "columns": [
+        {
+          "name": "A",
+          "type": "String"
+        },
+        {
+          "name": "B",
+          "type": "String"
+        }
+      ],
+      "primaryKey": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "name": "_TaskToTaskTag",
+      "columns": [
+        {
+          "name": "A",
+          "type": "String"
+        },
+        {
+          "name": "B",
+          "type": "String"
+        }
+      ],
+      "primaryKey": [
+        "A",
+        "B"
+      ]
+    }
+  ],
+  "relations": {
+    "trackMeta": [
+      "countItems"
+    ],
+    "trackItem": [
+      "countMeta"
+    ],
+    "task": [
+      "tags"
+    ],
+    "bookmark": [
+      "tags"
+    ],
+    "bookmarkTag": [
+      "bookmarks"
+    ],
+    "anniversary": [],
+    "media": [
+      "post",
+      "producer"
+    ],
+    "producer": [
+      "medias",
+      "posts",
+      "ProducerToProducerTag"
+    ],
+    "producerTag": [
+      "ProducerToProducerTag"
+    ],
+    "taskTag": [
+      "tasks"
+    ],
+    "post": [
+      "medias",
+      "producer"
+    ],
+    "producerToProducerTag": [
+      "producer",
+      "ProducerTag"
+    ],
+    "asset": [],
+    "customCommand": []
+  },
+  "enums": {
+    "CustomCommandReplyType": [
+      "TEXT",
+      "IMAGE_URL",
+      "RENDERED_IMAGE"
+    ],
+    "CustomCommandStatus": [
+      "PENDING",
+      "APPROVED",
+      "REJECTED"
+    ],
+    "Priority": [
+      "IMPORTANT_URGENT",
+      "IMPORTANT_NOT_URGENT",
+      "URGENT_NOT_IMPORTANT",
+      "NOT_IMPORTANT_NOT_URGENT"
+    ],
+    "UploadStatus": [
+      "PENDING",
+      "UPLOADED",
+      "FAILED",
+      "PROCESSING"
+    ],
+    "ProducerType": [
+      "WEIBO_PERSONAL",
+      "WEIBO_SUPER_TOPIC",
+      "XIAOHONGSHU_PERSONAL",
+      "XIAOHONGSHU_SUPER_TOPIC",
+      "DOUYIN_PERSONAL",
+      "DOUYIN_SUPER_TOPIC"
+    ],
+    "Platform": [
+      "WEIBO",
+      "XIAOHONGSHU",
+      "DOUYIN"
+    ]
+  }
+}

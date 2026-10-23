@@ -1,4 +1,6 @@
 'use server';
+import { callDataService } from '../../data/client';
+import type { Prisma } from '@prisma/client';
 
 import { UploadStatus } from '@prisma/client';
 import prisma from '../prisma';
@@ -50,38 +52,6 @@ const getBaseWhereClause = (
   ...getMediaTypeCondition(type),
 });
 
-// Seeded random generator (Mulberry32)
-function mulberry32(a: number) {
-  return function() {
-    let t = a += 0x6D2B79F5;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  }
-}
-
-// Simple string hash
-function stringToSeed(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return Math.abs(hash);
-}
-
-// Shuffle function
-function shuffleWithSeed<T>(array: T[], seed: number): T[] {
-  const rng = mulberry32(seed);
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
-}
-
 export async function getPicsCount(
   producerId: string | null,
   type: MediaType | null = null,
@@ -114,46 +84,10 @@ export async function getPics(
   try {
     // For random sort, we'll use a different approach to avoid ORDER BY RANDOM() performance issues
     if (sort === 'random') {
-      const whereClause = getBaseWhereClause(producerId, type, tagIds);
-
-      // Use provided seed or generate a random one if missing
-      // (Though client should usually provide one for consistent pagination)
-      const validSeed = seed ?? Math.floor(Math.random() * 1000000);
-
-      // 1. Fetch ALL IDs (lightweight)
-      const allMedia = await prisma.media.findMany({
-        where: whereClause,
-        select: { id: true },
-        orderBy: { id: 'asc' }, // Ensure initial order is consistent before shuffle
+      return callDataService<Prisma.MediaGetPayload<{ include: { producer: true; post: true } }>[] >('gallery/mediaPage', {
+        seed: seed ?? Math.floor(Math.random() * 1000000), skip: explicitSkip ?? (page - 1) * pageSize,
+        limit: pageSize, producerId, type, tagIds,
       });
-
-      const allIds = allMedia.map((m) => m.id);
-
-      // 2. Shuffle IDs deterministically
-      const shuffledIds = shuffleWithSeed(allIds, validSeed);
-
-      // 3. Slice for current page
-      // Use explicitSkip if available, otherwise calculate from page number
-      const startIndex = explicitSkip ?? ((page - 1) * pageSize);
-      const pageIds = shuffledIds.slice(startIndex, startIndex + pageSize);
-
-      if (pageIds.length === 0) {
-        return [];
-      }
-
-      // 4. Fetch details for the sliced IDs
-      const media = await prisma.media.findMany({
-        where: {
-          id: { in: pageIds },
-        },
-        include: {
-          producer: true,
-          post: true,
-        },
-      });
-
-      // 5. Reorder results to match the shuffled order
-      return media.sort((a, b) => pageIds.indexOf(a.id) - pageIds.indexOf(b.id));
     }
 
     // Normal sorting

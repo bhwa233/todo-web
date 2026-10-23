@@ -1,3 +1,4 @@
+import { AiJobControl } from '@/components/ai-job-control';
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { CompleteBookmark, deleteBookmark } from "../../src/api/bookmark"
 import { Ellipsis } from "lucide-react";
@@ -71,6 +72,7 @@ export function BookmarkCard({ bookmark, setBookmarks }: BookmarkCardProps) {
                     <span>{bookmark.url ? new URL(bookmark.url).hostname : 'Invalid URL'}</span>
                     <span className="mx-2">•</span>
                     <span>{dayjs(bookmark.createTime).format('YYYY-MM-DD')}</span>
+                    <AiJobControl targetId={bookmark.id} />
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="ml-auto">

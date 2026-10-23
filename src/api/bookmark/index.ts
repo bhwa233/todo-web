@@ -1,7 +1,8 @@
 'use server';
-import { PrismaClient, Bookmark, BookmarkTag } from '@prisma/client';
-import { getSummarizeBookmarkByContent } from '../ai/aiActions';
+import { requireAdmin } from '../../lib/auth';
+import { Bookmark, BookmarkTag } from '@prisma/client';
 import prisma from '../prisma';
+import { callDataService } from '../../data/client';
 
 
 interface CreateBookmarkData {
@@ -16,113 +17,13 @@ interface CreateBookmarkData {
 export const createBookmark = async (
   data: CreateBookmarkData,
 ): Promise<CompleteBookmark | null> => {
-  // 验证 URL
-  if (!data.url || typeof data.url !== 'string' || data.url.trim() === '') {
-    throw new Error('URL is required and cannot be empty');
-  }
-
-  const bookmarkData = {
-    url: data.url,
-    title: data.title || '',
-    image: data.image || '',
-    remark: data.remark || '',
-  };
-
-  // 创建新书签
-  const newBookmark = await prisma.bookmark.upsert({
-    where: { url: bookmarkData.url },
-    update: { ...bookmarkData, loading: true },
-    create: { ...bookmarkData, loading: true },
-  });
-  // 如果提供了内容，则生成AI摘要和标签，并返回完整书签
-  if (data.content && data.content.trim() !== '') {
-    try {
-      const updatedBookmark = await summarizeBookmarkByContent(newBookmark.id, data.content);
-      // 如果AI摘要成功，返回包含summary和tags的完整书签
-      if (updatedBookmark) {
-        return updatedBookmark;
-      }
-    } catch (error) {
-      console.error('生成AI摘要失败:', error);
-      // 如果AI摘要失败，至少将loading状态设为false
-      await prisma.bookmark.update({
-        where: { id: newBookmark.id },
-        data: { loading: false },
-      }).catch(updateError => {
-        console.error('更新loading状态失败:', updateError);
-      });
-    }
-  }
-
-  // 如果没有AI处理，返回包含空tags的完整书签
-  const completeBookmark = await prisma.bookmark.findUnique({
-    where: { id: newBookmark.id },
-    include: { tags: true },
-  });
-
-  return completeBookmark;
+  await requireAdmin();
+  return callDataService<CompleteBookmark>('record/createBookmark', data);
 };
 
-// 通过文章内容总结书签
 export async function summarizeBookmarkByContent(id: string, content: string) {
-  try {
-    const tags: BookmarkTag[] = await getBookmarkTags()
-    const data = await getSummarizeBookmarkByContent(content, tags.map(tag => tag.name));
-    if (!data) {
-      throw new Error('Failed to get summary data');
-    }
-
-    // 确保 data.tags 是数组
-    const tagArray = Array.isArray(data.tags) ? data.tags : [];
-
-    // First find existing tags
-    const existingTags = await prisma.bookmarkTag.findMany({
-      where: {
-        name: { in: tagArray }
-      }
-    });
-
-    // Create missing tags
-    const existingTagNames = existingTags.map(t => t.name);
-    const missingTagNames = tagArray.filter(t => !existingTagNames.includes(t));
-    const newTags = await Promise.all(
-      missingTagNames.map(name =>
-        prisma.bookmarkTag.create({ data: { name } })
-      )
-    );
-
-    const allTags = [...existingTags, ...newTags];    // Remove all existing tag connections first
-    await prisma.bookmark.update({
-      where: { id },
-      data: {
-        tags: {
-          set: [], // This will remove all existing tag connections
-        },
-      },
-    });
-
-    // Update bookmark with new data and tags
-    const updatedBookmark = await prisma.bookmark.update({
-      where: { id },
-      data: {
-        title: data.title || '',
-        summary: data.summary || '',
-        tags: {
-          connect: allTags.map(tag => ({ id: tag.id }))
-        },
-        loading: false
-      },
-      include: { tags: true },
-    });
-
-    console.info(
-      `Updated bookmark ${updatedBookmark.title}-${updatedBookmark.id} with tags ${updatedBookmark.tags.map((tag) => tag.name).join(', ')}`,
-    );
-    return updatedBookmark;
-  } catch (e) {
-    console.error('Error in summarizeBookmarkByContent:', e);
-    return null;
-  }
+  await requireAdmin();
+  return callDataService<CompleteBookmark>('ai/bookmark', { id, content });
 }
 
 // 获取所有书签
@@ -136,6 +37,7 @@ interface GetAllBookmarksOptions {
 export const getAllBookmarks = async (
   options: GetAllBookmarksOptions,
 ): Promise<CompleteBookmark[]> => {
+  await requireAdmin();
   const { keyword, tagId } = options;
   return await prisma.bookmark.findMany({
     take: 100,
@@ -163,18 +65,8 @@ export const getAllBookmarks = async (
 export const getSingleBookmark = async (
   id: string,
 ): Promise<CompleteBookmark | null> => {
-  let bookmark = await prisma.bookmark.findUnique({
-    where: { id },
-    include: { tags: true },
-  });
-  while (bookmark?.loading) {
-    await new Promise((resolve) => setTimeout(resolve, 4000));
-    bookmark = await prisma.bookmark.findUnique({
-      where: { id },
-      include: { tags: true },
-    });
-  }
-  return bookmark;
+  await requireAdmin();
+  return prisma.bookmark.findUnique({ where: { id }, include: { tags: true } });
 };
 
 // 更新书签
@@ -182,25 +74,13 @@ export const updateBookmark = async (
   id: string,
   data: Bookmark,
 ): Promise<Bookmark> => {
-  // 删除之前关联的标签
-  await prisma.bookmark.update({
-    where: { id },
-    data: {
-      tags: {
-        set: [],
-      },
-    },
-  });
-
-  // 更新书签数据
-  return await prisma.bookmark.update({
-    where: { id },
-    data,
-  });
+  await requireAdmin();
+  return callDataService<Bookmark>('record/bookmark', { id, data, tagIds: [] });
 };
 
 // 删除书签
 export const deleteBookmark = async (id: string): Promise<Bookmark> => {
+  await requireAdmin();
   return await prisma.bookmark.delete({
     where: { id },
   });
@@ -211,11 +91,13 @@ export interface BookmarkTagWithCount extends BookmarkTag {
 }
 
 export const getBookmarkTags = async (): Promise<BookmarkTag[]> => {
+  await requireAdmin();
   return await prisma.bookmarkTag.findMany();
 }
 
 // 获取所有标签，并查询每个标签下的关联多少个书签
 export const getAllBookmarkTags = async (): Promise<BookmarkTagWithCount[]> => {
+  await requireAdmin();
   const data = await prisma.bookmarkTag.findMany({
     include: { bookmarks: true },
   });
@@ -231,6 +113,7 @@ export const getAllBookmarkTags = async (): Promise<BookmarkTagWithCount[]> => {
 
 // 通过 URL 获取书签
 export const getBookmarkByUrl = async (url: string): Promise<CompleteBookmark | null> => {
+  await requireAdmin();
   return await prisma.bookmark.findFirst({
     where: { url },
     include: { tags: true },
@@ -239,6 +122,7 @@ export const getBookmarkByUrl = async (url: string): Promise<CompleteBookmark | 
 
 // 通过 URL 删除书签
 export const deleteBookmarkByUrl = async (url: string): Promise<Bookmark | null> => {
+  await requireAdmin();
   const bookmark = await prisma.bookmark.findFirst({
     where: { url },
   });
@@ -257,6 +141,7 @@ export const updateBookmarkTag = async (
   id: string,
   data: BookmarkTag,
 ): Promise<BookmarkTag> => {
+  await requireAdmin();
   return await prisma.bookmarkTag.update({
     where: { id },
     data,
@@ -265,6 +150,7 @@ export const updateBookmarkTag = async (
 
 // 删除标签
 export const deleteBookmarkTag = async (id: string): Promise<BookmarkTag> => {
+  await requireAdmin();
   return await prisma.bookmarkTag.delete({
     where: { id },
   });

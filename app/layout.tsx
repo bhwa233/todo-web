@@ -7,7 +7,7 @@ import { CssBaseline } from '@mui/material';
 import { ThemeProvider as NextThemeProvider } from "@/components/theme-provider"
 import Header from './Header';
 import { SidebarProvider } from '../src/components/ui/sidebar';
-import { SpeedInsights } from '@vercel/speed-insights/next';
+import { PwaRegistration } from '../src/components/pwa-registration';
 import { Toaster } from '../src/components/ui/toaster';
 
 
@@ -32,7 +32,7 @@ export default function RootLayout({
                   <Header />
                   {children}
                   <Toaster />
-                  <SpeedInsights />
+                  <PwaRegistration />
                 </main>
               </NextThemeProvider>
             </ThemeProvider>

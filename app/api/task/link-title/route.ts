@@ -1,3 +1,4 @@
+import { currentRole } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { unstable_cache } from 'next/cache';
 import { fetchPageTitle, publicPageUrl } from '@/api/task/linkTitleFetch';
@@ -8,13 +9,7 @@ const cachedTitle = unstable_cache(fetchPageTitle, ['task-link-title-v1'], {
 });
 
 export async function GET(request: NextRequest) {
-  const role = request.cookies.get('auth_role')?.value;
-  if (
-    (process.env.EDIT_CODE || process.env.GALLERY_EDIT_CODE) &&
-    role !== 'admin' &&
-    !(!role && process.env.EDIT_CODE && request.cookies.has('auth_token'))
-  )
-    return NextResponse.json({ title: null }, { status: 401 });
+  if (await currentRole() !== 'admin') return NextResponse.json({ title: null }, { status: 401 });
   const input = request.nextUrl.searchParams.get('url');
   let url: URL;
   try {
@@ -29,8 +24,9 @@ export async function GET(request: NextRequest) {
       { title },
       { headers: { 'Cache-Control': 'private, max-age=3600' } },
     );
-  } catch {
+  } catch (error) {
     // An unavailable title never prevents the original link from being used.
+    console.warn('link_preview_failed', error instanceof Error ? error.name : 'UnknownError', error instanceof Error ? error.stack?.split('\n').slice(1, 3) : []);
     return NextResponse.json(
       { title: null },
       { headers: { 'Cache-Control': 'private, max-age=300' } },

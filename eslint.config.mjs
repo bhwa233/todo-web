@@ -1,13 +1,20 @@
+import importPlugin from 'eslint-plugin-import';
 import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
 
 export default [
   ...nextCoreWebVitals,
+  { plugins: { import: importPlugin } },
   {
     ignores: [
       '.next/**',
       '.vercel/**',
       'build/**',
+      'dist/**',
+      'worker-configuration.d.ts',
       'node_modules/**',
+      '**/.wrangler/**',
+      '**/.migration/**',
+      'data-service/worker-configuration.d.ts',
       'out/**',
       'public/sw.js',
       'next-env.d.ts',
@@ -42,6 +49,10 @@ export default [
         },
       ],
     },
+  },
+  {
+    files: ['scripts/d1/*.mjs'],
+    rules: { 'import/extensions': ['warn', 'ignorePackages', { ts: 'always' }] },
   },
   {
     files: ['**/*.{ts,tsx}'],

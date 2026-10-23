@@ -1,0 +1,81 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "todo-data-service-preview",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "READ_ONLY": "true",
+    "ALLOW_LOCAL_HTTP_WEB_API": "false",
+    "WEB_API_TOKEN": "",
+    "AI_PROMPT": "",
+  },
+  "secrets": {
+    "required": ["SPIDER_API_TOKEN", "AI_BASE_URL", "AI_MODEL", "AI_API_KEY"],
+  },
+  "triggers": { "crons": ["* * * * *"] },
+  "queues": {
+    "producers": [
+      { "binding": "AI_JOBS", "queue": "todo-ai-preview" },
+      { "binding": "AI_FAILURES", "queue": "todo-ai-failures-preview" },
+    ],
+    "consumers": [
+      {
+        "queue": "todo-ai-preview",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "todo-ai-failures-preview",
+      },
+    ],
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "todo-data-preview",
+      "database_id": "03abe360-703c-4528-82e1-f76b04f21176",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "env": {
+    "production": {
+      "name": "todo-data-service",
+      "secrets": {
+        "required": [
+          "SPIDER_API_TOKEN",
+          "AI_BASE_URL",
+          "AI_MODEL",
+          "AI_API_KEY",
+        ],
+      },
+      "vars": {
+        "READ_ONLY": "false",
+        "ALLOW_LOCAL_HTTP_WEB_API": "false",
+        "WEB_API_TOKEN": "",
+        "AI_PROMPT": "",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "todo-data-production",
+          "database_id": "c68ad351-2e9e-4eb5-8636-40307c7a722a",
+          "migrations_dir": "migrations",
+        },
+      ],
+      "queues": {
+        "producers": [
+          { "binding": "AI_JOBS", "queue": "todo-ai" },
+          { "binding": "AI_FAILURES", "queue": "todo-ai-failures" },
+        ],
+        "consumers": [
+          {
+            "queue": "todo-ai",
+            "max_batch_size": 1,
+            "max_retries": 3,
+            "dead_letter_queue": "todo-ai-failures",
+          },
+        ],
+      },
+    },
+  },
+}

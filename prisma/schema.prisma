@@ -1,10 +1,11 @@
 generator client {
   provider = "prisma-client-js"
+  engineType = "client"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./local.db"
 }
 
 model TrackMeta {
@@ -162,7 +163,7 @@ model ProducerToProducerTag {
   producer    Producer    @relation(fields: [A], references: [id], onDelete: Cascade)
   ProducerTag ProducerTag @relation(fields: [B], references: [id], onDelete: Cascade)
 
-  @@id([A, B], map: "_ProducerToProducerTag_AB_pkey")
+  @@id([A, B])
   @@index([B], map: "_ProducerToProducerTag_B_index")
   @@map("_ProducerToProducerTag")
 }
@@ -175,6 +176,42 @@ model Asset {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Historical command records are retained here; SparkHub owns the live service.
+model CustomCommand {
+  id              String                 @id
+  ownerKeyHash    String
+  name            String
+  command         String                 @unique
+  description     String?
+  replyType       CustomCommandReplyType
+  contentText     String?
+  imageUrl        String?
+  enabled         Boolean                @default(true)
+  sortOrder       Int                    @default(0)
+  createTime      DateTime               @default(now())
+  updateTime      DateTime               @default(now())
+  reviewComment   String?
+  reviewedAt      DateTime?
+  reviewerKeyHash String?
+  status          CustomCommandStatus    @default(PENDING)
+  submittedAt     DateTime               @default(now())
+
+  @@index([status, enabled, sortOrder])
+  @@index([ownerKeyHash, status])
+}
+
+enum CustomCommandReplyType {
+  TEXT
+  IMAGE_URL
+  RENDERED_IMAGE
+}
+
+enum CustomCommandStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum Priority {

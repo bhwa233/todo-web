@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import remoteDb from '../prisma';
 import {
   afterAll,
   beforeAll,
@@ -9,30 +9,22 @@ import {
   vi,
 } from 'vitest';
 
-// Run only against an explicitly provided, disposable local database. Create its
-// tables with the real prisma/schema.prisma; never use application credentials.
-const databaseUrl = process.env.GALLERY_TEST_DATABASE_URL;
-if (databaseUrl) {
-  const url = new URL(databaseUrl);
-  if (
-    !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ||
-    !url.pathname.endsWith('_test') ||
-    url.search
-  ) {
-    throw new Error(
-      'GALLERY_TEST_DATABASE_URL must name a disposable local database ending in _test, without query parameters',
-    );
-  }
+// Run only against an isolated disposable local Worker with the real D1
+// migrations applied. Never use application or remote Cloudflare credentials.
+const serviceUrl = process.env.TEST_DATA_SERVICE_URL;
+if (serviceUrl && !['localhost', '127.0.0.1', '[::1]'].includes(new URL(serviceUrl).hostname)) {
+  throw new Error('TEST_DATA_SERVICE_URL must name a disposable local Worker');
 }
 
-describe.skipIf(!databaseUrl)(
-  'gallery config transactions (local PostgreSQL)',
+describe.skipIf(!serviceUrl)(
+  'gallery config transactions (local D1)',
   () => {
-    let db: PrismaClient;
+    let db: typeof remoteDb;
     let service: typeof import('./configService');
     beforeAll(async () => {
-      vi.stubEnv('DATABASE_URL', databaseUrl!);
-      db = new PrismaClient({ datasourceUrl: databaseUrl });
+      vi.stubEnv('DATA_SERVICE_URL', serviceUrl!);
+      vi.stubEnv('DATA_SERVICE_TOKEN', process.env.TEST_DATA_SERVICE_TOKEN!);
+      db = remoteDb;
       service = await import('./configService');
     });
     beforeEach(async () => {
@@ -43,9 +35,6 @@ describe.skipIf(!databaseUrl)(
       await db.producerTag.deleteMany();
     });
     afterAll(async () => {
-      await db.$disconnect();
-      const { default: sharedDb } = await import('../prisma');
-      await sharedDb.$disconnect();
       vi.unstubAllEnvs();
     });
 

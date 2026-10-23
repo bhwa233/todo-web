@@ -1,7 +1,8 @@
 'use server';
+import { requireAdmin } from '../lib/auth';
 import { TrackMeta, TrackItem } from '@prisma/client';
 import prisma from './prisma';
-
+import { callDataService } from '../data/client';
 
 // TrackMeta CRUD
 interface CreateTrackMetaParams {
@@ -13,6 +14,7 @@ export async function createTrackMeta({
   name,
   type,
 }: CreateTrackMetaParams): Promise<TrackMeta> {
+  await requireAdmin();
   return prisma.trackMeta.create({
     data: {
       name,
@@ -22,6 +24,7 @@ export async function createTrackMeta({
 }
 
 export async function fetchTrackMetas() {
+  await requireAdmin();
   return prisma.trackMeta.findMany({
     include: {
       countItems: {
@@ -46,6 +49,7 @@ interface UpdateTrackMetaParams {
 export async function queryTrackMetaById(
   id: string,
 ): Promise<TrackMeta | null> {
+  await requireAdmin();
   return prisma.trackMeta.findUnique({
     where: { id },
     include: {
@@ -64,6 +68,7 @@ export async function updateTrackMeta({
   type,
   remark,
 }: UpdateTrackMetaParams): Promise<TrackMeta> {
+  await requireAdmin();
   return prisma.trackMeta.update({
     where: { id },
     data: {
@@ -75,6 +80,7 @@ export async function updateTrackMeta({
 }
 
 export async function deleteTrackMeta(id: string): Promise<TrackMeta> {
+  await requireAdmin();
   return prisma.trackMeta.delete({
     where: { id },
   });
@@ -85,30 +91,23 @@ export async function createTrackItem(
   createTime: Date = new Date(),
   remark: string = '',
 ): Promise<TrackMeta> {
-  await prisma.trackItem.create({
-    data: {
-      remark: remark,
-      countMetaId,
-      createTime,
-    },
+  await requireAdmin();
+  return callDataService<TrackMeta>('record/createTrackItem', {
+    countMetaId,
+    createTime,
+    remark,
   });
-  await prisma.trackMeta.update({
-    where: { id: countMetaId },
-    data: {
-      updateTime: new Date(),
-    },
-  });
-  const data = await queryTrackMetaById(countMetaId);
-  return data as TrackMeta;
 }
 
 export async function fetchTrackItems(): Promise<TrackItem[]> {
+  await requireAdmin();
   return prisma.trackItem.findMany();
 }
 
 export async function fetchTrackItemById(
   id: string,
 ): Promise<TrackItem | null> {
+  await requireAdmin();
   return prisma.trackItem.findUnique({
     where: { id },
   });
@@ -125,6 +124,7 @@ export async function updateTrackItem({
   remark,
   countMetaId,
 }: UpdateTrackItemParams): Promise<TrackItem> {
+  await requireAdmin();
   return prisma.trackItem.update({
     where: { id },
     data: {
@@ -135,14 +135,6 @@ export async function updateTrackItem({
 }
 
 export async function deleteTrackItem(id: string): Promise<TrackItem> {
-  const trackItem = await prisma.trackItem.delete({
-    where: { id },
-  });
-  await prisma.trackMeta.update({
-    where: { id: trackItem.countMetaId! },
-    data: {
-      updateTime: new Date(),
-    },
-  });
-  return trackItem;
+  await requireAdmin();
+  return callDataService<TrackItem>('record/deleteTrackItem', { id });
 }

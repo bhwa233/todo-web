@@ -1,4 +1,5 @@
 'use client'
+import { getAiJobStatus } from '@/api/ai/jobActions';
 import { useState } from "react"
 import { Search, X } from 'lucide-react'
 import { Input } from "@/components/ui/input"
@@ -40,8 +41,12 @@ export default function BookmarkManager() {
         mutate(produce(bookmarks, draft => {
             draft.unshift({ ...newBookmark, tags: [] });
         }));
-        const updatedBookmark = await getSingleBookmark(newBookmark.id);
-        if (updatedBookmark) {
+        let updatedBookmark = await getSingleBookmark(newBookmark.id);
+        for (let attempt = 0; updatedBookmark?.loading && attempt < 45; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 4000));
+            updatedBookmark = await getSingleBookmark(newBookmark.id);
+        }
+        if (updatedBookmark && !updatedBookmark.loading) {
             mutate(bookmarks => {
                 return bookmarks?.map(bookmark => {
                     if (bookmark.id === updatedBookmark.id) {
@@ -50,10 +55,10 @@ export default function BookmarkManager() {
                     return bookmark;
                 });
             });
-            toast({
-                title: 'AI摘要生成成功',
-                description: `书签 ${updatedBookmark!.url} AI摘要生成成功,标题为${updatedBookmark!.title}，标签为${updatedBookmark!.tags.map(tag => tag.name).join(', ')}`
-            })
+            const job = await getAiJobStatus(newBookmark.id);
+            toast({ title: job?.status === 'FAILED' ? 'AI 摘要生成失败，可在书签中重试' : job?.status === 'DONE' ? 'AI 摘要生成成功' : '书签已保存', variant: job?.status === 'FAILED' ? 'destructive' : 'default' });
+        } else {
+            toast({ title: '摘要仍在处理中', description: '稍后刷新书签查看结果。' });
         }
     })
     console.log()

@@ -84,7 +84,7 @@ const useConfigStore = create<SettingStore>()(
                         if (!response.ok) {
                             throw new Error('auth status failed');
                         }
-                        const data = await response.json();
+                        const data: { role?: unknown } = await response.json() as { role?: unknown };
                         const role = data?.role === 'admin' || data?.role === 'gallery' ? data.role : 'none';
                         set((state) => {
                             state.role = role;

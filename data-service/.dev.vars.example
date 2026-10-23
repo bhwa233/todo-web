@@ -1,0 +1,6 @@
+WEB_API_TOKEN=replace-with-a-random-local-token
+SPIDER_API_TOKEN=replace-with-a-different-random-local-token
+AI_BASE_URL=https://api.stepfun.com/v1
+AI_MODEL=step-3.7-flash
+AI_API_KEY=
+# Keep production read-only until final import and verification complete.

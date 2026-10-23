@@ -1,6 +1,7 @@
 'use server';
 import type { Producer } from '@prisma/client';
-import { cookies } from 'next/headers';
+import { currentRole } from '../../lib/auth';
+import { verifyAccessCode } from '../../lib/auth-session';
 import { NewProducer, UpdateProducer } from './type';
 import { GalleryConfigError } from './configErrors';
 import {
@@ -16,28 +17,8 @@ import {
 
 // 验证编辑密码
 const verifyEditCode = async (editCode?: string): Promise<boolean> => {
-  const adminCode = process.env.EDIT_CODE;
-  const galleryCode = process.env.GALLERY_EDIT_CODE;
-  if (!adminCode && !galleryCode) {
-    return true; // 如果没有设置密码要求，则允许所有操作
-  }
-
-  if (editCode && (editCode === adminCode || editCode === galleryCode)) {
-    return true;
-  }
-
-  const cookieStore = await cookies();
-  const role = cookieStore.get('auth_role')?.value;
-  if (role === 'admin' || role === 'gallery') {
-    return true;
-  }
-
-  // Backward compatibility for legacy auth token
-  if (!role && cookieStore.has('auth_token') && adminCode) {
-    return true;
-  }
-
-  return false;
+  const role = editCode ? verifyAccessCode(editCode) : await currentRole();
+  return role === 'admin' || role === 'gallery';
 };
 
 // Web actions authenticate with the existing gallery login; MCP authenticates
