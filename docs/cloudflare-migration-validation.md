@@ -1,7 +1,7 @@
 # Cloudflare 迁移实施记录
 
 日期：2026-10-22。分支：两个仓库均为 `feature/cloudflare-d1`。
-当前处于预览验收与发布准备阶段，正式域名仍指向 Vercel，旧 PostgreSQL 仍是现网数据源。
+本文保留预览与演练记录。2026-10-23 正式切换已完成，当前结果与最终数据见 [正式上线记录](cloudflare-production-release.md)。
 
 ## 备份与全量演练
 

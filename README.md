@@ -1,5 +1,7 @@
 # Todo Web 应用
 
+正式站：[own.bhwa233.com](https://own.bhwa233.com/)。[Cloudflare 上线记录](docs/cloudflare-production-release.md)。
+
 网站采用 vinext + Vite 部署至 Cloudflare Workers，通过内部 Service Binding 访问独立 D1 数据服务；爬虫仍在 GitHub Actions。
 本地运行、全量数据迁移与维护窗口切换步骤见 [D1 迁移说明](docs/d1-migration.md)。
 
