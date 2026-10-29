@@ -17,6 +17,7 @@ import { galleryCommand } from './gallery';
 import { taskCommand } from './tasks';
 import { recordCommand } from './records';
 import { spiderCommand, spiderReads } from './spider';
+import { spiderSnapshot } from './spider-monitor';
 
 function matches(token: string, secret: string | undefined) {
   if (!secret || !token) return false;
@@ -245,6 +246,34 @@ export class TodoDataService extends WorkerEntrypoint<TodoDataEnv> {
       true,
     );
     return response.text();
+  }
+}
+
+// Available only through an explicit service binding. This entrypoint exposes
+// no crawler writes, arbitrary queries, or credentials to the admin API.
+export class WeiboMonitor extends WorkerEntrypoint<TodoDataEnv> {
+  async fetch(request: Request): Promise<Response> {
+    if (
+      request.method !== 'GET' ||
+      new URL(request.url).pathname !== '/snapshot'
+    )
+      return new Response(null, { status: 404 });
+    try {
+      const version = new URL(request.url).searchParams.get(
+        'credentialVersion',
+      );
+      if (version && !z.string().uuid().safeParse(version).success)
+        return new Response(null, { status: 400 });
+      return Response.json(
+        await spiderSnapshot(this.env.DB, version ?? undefined),
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
+    } catch {
+      return Response.json(
+        { error: 'weibo_monitor_unavailable' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
   }
 }
 

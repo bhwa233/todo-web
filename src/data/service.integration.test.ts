@@ -18,6 +18,68 @@ describe.skipIf(!serviceUrl)('D1 data service invariants', () => {
   });
   afterAll(() => vi.unstubAllEnvs());
 
+  it('pins run credentials and prevents late heartbeats from overwriting terminal results', async () => {
+    const id = crypto.randomUUID();
+    const credentialVersion = crypto.randomUUID();
+    async function command(operation: string, input: unknown) {
+      return fetch(`${serviceUrl}/v1/spider/${operation}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${process.env.TEST_SPIDER_SERVICE_TOKEN}`,
+        },
+        body: superjson.stringify(input),
+      });
+    }
+    expect(
+      (
+        await command('runStart', {
+          id,
+          kind: 'consumer',
+          githubRunId: null,
+          githubRunAttempt: null,
+        })
+      ).status,
+    ).toBe(200);
+    const progress = {
+      id,
+      status: 'running',
+      credentialVersion,
+      loginStatus: 'verified',
+      errorCode: null,
+      summary: {
+        processedSources: 0,
+        processedPosts: 2,
+        completedPosts: 1,
+        failedPosts: 1,
+        deferredPosts: 0,
+        uploadedMedia: 3,
+        skippedMedia: 0,
+        failedMedia: 1,
+      },
+    };
+    expect((await command('runUpdate', progress)).status).toBe(200);
+    expect(
+      (
+        await command('runUpdate', {
+          ...progress,
+          credentialVersion: crypto.randomUUID(),
+        })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await command('runUpdate', {
+          ...progress,
+          status: 'failed',
+          loginStatus: 'rejected',
+          errorCode: 'weibo_request_blocked',
+        })
+      ).status,
+    ).toBe(200);
+    expect((await command('runUpdate', progress)).status).toBe(409);
+  });
+
   it('keeps seeded gallery pages stable and disjoint without returning other sources', async () => {
     const producer = await prisma.producer.create({
       data: { name: `random-${crypto.randomUUID()}` },

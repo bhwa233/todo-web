@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { DataServiceError } from '../../src/data/protocol';
 import { atomic, guard, insert, update } from './atomic';
 import { dateValue, nextVersion, type Database } from './db';
+import { spiderRunCommand } from './spider-monitor';
 
 export const spiderReads = new Set([
   'producers',
@@ -41,6 +42,8 @@ export async function spiderCommand(
   operation: string,
   input: unknown,
 ) {
+  if (operation === 'runStart' || operation === 'runUpdate')
+    return spiderRunCommand(db, operation, input);
   if (operation === 'producers') {
     const { type } = z.object({ type: z.enum(ProducerType) }).parse(input);
     return prisma.producer.findMany({
