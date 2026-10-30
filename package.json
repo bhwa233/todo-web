@@ -35,7 +35,7 @@
     "cf:deploy:preview": "wrangler deploy --config dist/server/wrangler.json",
     "cf:deploy:production": "wrangler deploy --config dist/server/wrangler.json",
     "build:production": "pnpm data:generate && cross-env CLOUDFLARE_ENV=production vinext build",
-    "data:deploy:production": "wrangler deploy --config data-service/wrangler.jsonc --env production",
+    "data:deploy:production": "pnpm data:migrate:production && wrangler deploy --config data-service/wrangler.jsonc --env production",
     "data:migrate:production": "wrangler d1 migrations apply DB --remote --config data-service/wrangler.jsonc --env production"
   },
   "dependencies": {

@@ -64,6 +64,14 @@ pnpm cf:deploy:production
 pnpm data:deploy:production
 ```
 
+`data:deploy:production` 会先应用生产 D1 中尚未执行的迁移，再发布数据 Worker；
+迁移失败时停止发布。`0006_spider_post_claims.sql` 新增领取回执表，
+`spider/claimPostOnce` 在同一 D1 原子批次内保存请求 UUID、选中的帖子或空队列结果，
+并将帖子标记为处理中。同一 UUID 重试返回同一领取结果，不再领取第二帖；
+旧 `spider/claimPost` 保留兼容，但客户端不能将它作为安全重试的回退。
+回执保留 7 天，由后续 `recoverPosts` 调用清理，帖子和媒体进度不受清理影响。
+先完成这次数据服务发布，再更新 galaxy-spider 客户端。
+
 构建和发布必须依次完成，不能一边重建 dist 一边上传。
 正式发布前检查 `dist/server/wrangler.json` 的 name=todo-web、APP_ENV=production、TODO_DATA=todo-data-service。
 正式源配置已包含 own.bhwa233.com 的 Custom Domain；生产发布会保持该绑定。

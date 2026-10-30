@@ -94,6 +94,48 @@ export async function spiderCommand(
       },
     });
   }
+  if (operation === 'claimPostOnce') {
+    const { requestId, runStartedAt } = z
+      .object({ requestId: z.string().uuid(), runStartedAt: z.date() })
+      .strict()
+      .parse(input);
+    const started = dateValue(runStartedAt);
+    const now = dateValue(nextVersion());
+    // D1 batch is atomic. Concurrent deliveries of one request share the same
+    // claim (including an empty queue) rather than allocating another post.
+    const results = await db.batch<{
+      post_id: string | null;
+      run_started_at: string;
+    }>([
+      db
+        .prepare(
+          `INSERT INTO spider_post_claims (request_id,run_started_at,post_id,created_at)
+         SELECT ?,?,(SELECT id FROM Post WHERE platform='WEIBO' AND deletedAt IS NULL
+           AND (status='PENDING' OR (status='FAILED' AND updateTime<?))
+           ORDER BY updateTime ASC,id ASC LIMIT 1),?
+         ON CONFLICT(request_id) DO NOTHING`,
+        )
+        .bind(requestId, started, started, now),
+      db
+        .prepare(
+          `UPDATE Post SET status='PROCESSING', updateTime=?
+         WHERE id=(SELECT post_id FROM spider_post_claims WHERE request_id=? AND run_started_at=?)
+           AND deletedAt IS NULL AND (status='PENDING' OR (status='FAILED' AND updateTime<?))`,
+        )
+        .bind(now, requestId, started, started),
+      db
+        .prepare(
+          'SELECT post_id,run_started_at FROM spider_post_claims WHERE request_id=?',
+        )
+        .bind(requestId),
+    ]);
+    const claim = results[2].results[0];
+    if (!claim || claim.run_started_at !== started)
+      throw new DataServiceError('CONFLICT', '领取请求标识与采集轮次不匹配。');
+    return claim.post_id
+      ? prisma.post.findUniqueOrThrow({ where: { id: claim.post_id } })
+      : null;
+  }
   if (operation === 'claimPost') {
     const { runStartedAt } = z.object({ runStartedAt: z.date() }).parse(input);
     const claimed = await db
@@ -114,6 +156,12 @@ export async function spiderCommand(
   }
   if (operation === 'recoverPosts') {
     const { staleBefore } = z.object({ staleBefore: z.date() }).parse(input);
+    // Seven days far exceeds the client's bounded retry window. Keep this
+    // separate from post recovery: deleting a receipt never changes a post.
+    await db
+      .prepare('DELETE FROM spider_post_claims WHERE created_at<?')
+      .bind(dateValue(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)))
+      .run();
     const result = await prisma.post.updateMany({
       where: {
         platform: Platform.WEIBO,
