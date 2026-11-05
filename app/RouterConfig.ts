@@ -13,8 +13,7 @@ import {
   Music,
   MessageCircle,
   Clipboard,
-  CircleDollarSign,
-  Activity
+  CircleDollarSign
 } from 'lucide-react';
 
 export type Role = 'admin' | 'gallery' | 'none';
@@ -70,12 +69,6 @@ export const Apps: MenuItem[] = [
   { name: '命令聊天', url: '/chat', icon: MessageCircle },
   {
     name: '资产管理', url: '/fund', icon: CircleDollarSign, requiredRoles: ['admin']
-  },
-  {
-    name: '状态监控',
-    url: '/admin/monitor',
-    icon: Activity,
-    requiredRoles: ['admin']
   }
 ];
 

@@ -9,13 +9,12 @@ const ADMIN_ROUTES = [
   '/fund',
   '/bookmark',
   '/anniversary',
-  '/admin/monitor',
 ];
 
 export async function proxy(request: NextRequest) {
   const role = await sessionRole(request.cookies.get(SESSION_COOKIE)?.value);
   const { pathname } = request.nextUrl;
-  const previewPublic = pathname === '/login' || pathname.startsWith('/api/auth/') || pathname === '/api/mcp/gallery';
+  const previewPublic = pathname === '/admin/monitor' || pathname === '/api/admin/monitor' || pathname === '/login' || pathname.startsWith('/api/auth/') || pathname === '/api/mcp/gallery';
   if (process.env.APP_ENV === 'preview' && role === 'none' && !previewPublic) {
     return pathname.startsWith('/api/') ? NextResponse.json({ error: '需要登录' }, { status: 401, headers: { 'Cache-Control': 'private, no-store' } }) : NextResponse.redirect(new URL('/login', request.url));
   }

@@ -18,15 +18,8 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const currentApp = Apps.find((app) => app.url === pathname);
-  const monitorApp = Apps.find((app) => app.url === '/admin/monitor');
   const { role, logout, checkAuth } = useConfigStore();
   const visibleApps = Apps.filter((app) => canAccessApp(app, role));
-  const appsWithMonitorShortcut =
-    role !== 'none' &&
-      monitorApp &&
-      !visibleApps.some((app) => app.url === monitorApp.url)
-      ? [...visibleApps, monitorApp]
-      : visibleApps;
 
   const handleLogout = async () => {
     await logout();
@@ -64,7 +57,7 @@ export default function Header() {
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-[300px] p-4">
               <div className="grid grid-cols-3 gap-4">
-                {appsWithMonitorShortcut.map((app) => {
+                {visibleApps.map((app) => {
                   const Icon = app.icon;
                   return (
                     <Link
