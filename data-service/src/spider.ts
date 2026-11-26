@@ -154,6 +154,35 @@ export async function spiderCommand(
       .parse(input);
     return prisma.post.update({ where: { id }, data: { status } });
   }
+  if (operation === 'finishPostClaim') {
+    const { id, status, claimedAt, finishedAt } = idSchema
+      .extend({
+        status: z.enum([UploadStatus.FAILED, UploadStatus.UPLOADED]),
+        claimedAt: z.date(),
+        finishedAt: z.date(),
+      })
+      .strict()
+      .parse(input);
+    if (finishedAt <= claimedAt)
+      throw new DataServiceError('CONFLICT', '完成时间必须晚于领取版本。');
+    const updated = await db
+      .prepare(
+        `UPDATE Post SET status=?, updateTime=? WHERE id=? AND platform='WEIBO'
+         AND deletedAt IS NULL AND status='PROCESSING' AND updateTime=? RETURNING id`,
+      )
+      .bind(status, dateValue(finishedAt), id, dateValue(claimedAt))
+      .first<{ id: string }>();
+    if (updated) return { applied: true };
+    const replay = await db
+      .prepare(
+        `SELECT id FROM Post WHERE id=? AND platform='WEIBO' AND deletedAt IS NULL
+         AND status=? AND updateTime=?`,
+      )
+      .bind(id, status, dateValue(finishedAt))
+      .first<{ id: string }>();
+    if (replay) return { applied: true };
+    throw new DataServiceError('CONFLICT', '帖子领取版本已变更。');
+  }
   if (operation === 'recoverPosts') {
     const { staleBefore } = z.object({ staleBefore: z.date() }).parse(input);
     // Seven days far exceeds the client's bounded retry window. Keep this

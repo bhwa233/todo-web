@@ -298,6 +298,26 @@ describe.skipIf(!serviceUrl)('D1 data service invariants', () => {
       callDataService('spider/saveMedia', [media]),
     ]);
     expect(await prisma.media.count({ where: { postId: post.id } })).toBe(1);
+    const completion = {
+      id: post.id,
+      claimedAt: claimed.updateTime,
+      finishedAt: new Date(claimed.updateTime.getTime() + 1),
+      status: 'UPLOADED',
+    };
+    const finish = (input: typeof completion) =>
+      callDataService('spider/finishPostClaim', input);
+    await expect(
+      finish({ ...completion, claimedAt: new Date(claimed.updateTime.getTime() - 1) }),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    await expect(finish(completion)).resolves.toEqual({ applied: true });
+    await expect(finish(completion)).resolves.toEqual({ applied: true });
+    await expect(finish({ ...completion, status: 'FAILED' })).rejects.toMatchObject({
+      code: 'CONFLICT',
+    });
+    expect(await prisma.post.findUnique({ where: { id: post.id } })).toMatchObject({
+      status: 'UPLOADED',
+      updateTime: completion.finishedAt,
+    });
     await prisma.media.deleteMany({ where: { postId: post.id } });
     await prisma.post.delete({ where: { id: post.id } });
     await prisma.producer.delete({ where: { id: producer.id } });
